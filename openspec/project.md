@@ -8,7 +8,7 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 - EspoCRM (open-source CRM with email integration, REST API)
 - EspoMCP (MCP server bridging Claude to EspoCRM)
 - Claude Code + Anthropic Agent SDK (agentic AI layer)
-- Node.js (seed scripts, utilities)
+- Python (seed scripts, utilities)
 - TBD: A webUI frontend
 
 ## Project Conventions
@@ -17,6 +17,10 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 - Hackathon-pragmatic: working > polished
 - Prefer simple scripts over frameworks
 - Keep dependencies minimal
+
+### Scripts
+- All Python scripts in `scripts/` use a `uv` shebang (`#!/usr/bin/env -S uv run --script`) so they can be run directly: `scripts/agent.py "prompt"` (no `uv run` prefix needed)
+- Key scripts: `scripts/agent.py` (run agent prompts), `scripts/espo_cli.py` (EspoCRM REST API), `scripts/seed.py`, `scripts/reset.py`, `scripts/reseed.py`, `scripts/create_api_user.py`
 
 ### Architecture Patterns
 - **Agentic loop**: Claude processes emails one at a time from the CRM inbox, using EspoCRM as its read/write tool via MCP, as part of a work session
@@ -38,6 +42,9 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 - Key concerns: maintenance emergencies, RTB disputes, lease renewals, rent arrears, fire/safety compliance, corporate lets, noise complaints
 - Irish regulatory context: RTB (Residential Tenancies Board), RPZ (Rent Pressure Zones), gas safety certs, fire safety regulations
 - Property managers referenced by first name in emails (but names don't always match — e.g., "Sarah Brennan" signs as "Tara")
+
+## Frontend Integration
+A colleague is building a Next.js frontend in `frontend/`. Integration between the frontend and the agent/CRM backend is not yet in scope — current focus is on the email triage automation. Frontend integration will come later.
 
 ## Important Constraints
 - Hackathon time constraint: must be demoable quickly
