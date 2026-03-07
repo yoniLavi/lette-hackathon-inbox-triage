@@ -247,7 +247,7 @@ test_409_when_busy() {
 
     # Try a second request — should get 409
     local status_code
-    status_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+    status_code=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Content-Type: application/json" \
         -d '{"message": "hello"}' \
         "$AGENT_URL/prompt/stream" 2>/dev/null || echo "000")

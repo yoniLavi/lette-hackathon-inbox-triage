@@ -149,7 +149,13 @@ async def prompt(req: PromptRequest) -> PromptResponse:
 
 @app.post("/prompt/stream")
 async def prompt_stream(req: PromptRequest):
-    """SSE streaming endpoint — sends tool_use, text, and done events."""
+    """SSE streaming endpoint — sends tool_use, text, and done events.
+
+    Uses an asyncio.Queue to bridge between the SDK response consumer
+    (a regular coroutine) and the SSE generator.  This avoids iterating
+    the anyio-backed receive_response() inside a Starlette async-generator,
+    which hangs on multi-turn conversations.
+    """
     global _busy
 
     if _busy:
@@ -157,13 +163,19 @@ async def prompt_stream(req: PromptRequest):
 
     _busy = True
 
-    async def generate():
-        global _busy, _message_count
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    async def _consume():
+        """Read SDK response and push SSE strings into the queue."""
+        global _message_count
         try:
-            yield _sse_event("status", {"status": "connecting"})
             client = await _ensure_client()
-            yield _sse_event("status", {"status": "thinking"})
+            log.info("[stream] client ready, session=%s msg_count=%d", _session_id, _message_count)
+            await queue.put(_sse_event("status", {"status": "thinking"}))
+
+            log.info("[stream] calling client.query()...")
             await client.query(req.message)
+            log.info("[stream] query() returned, starting receive_response()...")
 
             text_parts: list[str] = []
             async for msg in client.receive_response():
@@ -173,20 +185,43 @@ async def prompt_stream(req: PromptRequest):
                     for block in msg.content:
                         if isinstance(block, ToolUseBlock):
                             log.info("  ToolUseBlock: %s", block.name)
-                            yield _sse_event("tool_use", {"tool": block.name})
+                            await queue.put(_sse_event("tool_use", {"tool": block.name}))
                         elif isinstance(block, ToolResultBlock):
                             log.info("  ToolResultBlock")
-                            yield _sse_event("tool_result", {"tool": getattr(block, "name", "")})
+                            await queue.put(_sse_event("tool_result", {"tool": getattr(block, "name", "")}))
                         elif isinstance(block, TextBlock):
                             log.info("  TextBlock: %s...", block.text[:80])
                             text_parts.append(block.text)
-                            yield _sse_event("text", {"text": block.text})
+                            await queue.put(_sse_event("text", {"text": block.text}))
 
             _message_count += 1
-            yield _sse_event("done", {"response": "\n".join(text_parts) or "(no response)"})
+            await queue.put(_sse_event("done", {"response": "\n".join(text_parts) or "(no response)"}))
         except Exception as exc:
+            log.error("[stream] error: %s", exc)
             await _teardown_client()
-            yield _sse_event("error", {"detail": str(exc)})
+            await queue.put(_sse_event("error", {"detail": str(exc)}))
+        finally:
+            await queue.put(None)  # sentinel
+
+    async def generate():
+        global _busy
+        try:
+            yield _sse_event("status", {"status": "connecting"})
+            task = asyncio.create_task(_consume())
+            try:
+                while True:
+                    event = await queue.get()
+                    if event is None:
+                        break
+                    yield event
+            finally:
+                # Ensure the consumer task finishes even if the client disconnects
+                if not task.done():
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
         finally:
             _busy = False
 
