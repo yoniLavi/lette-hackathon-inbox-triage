@@ -83,7 +83,12 @@ def parse_addresses(field):
     return [a.strip() for a in field.split(",") if a.strip()]
 
 
-def seed_emails(api, emails):
+def get_user_id(api):
+    """Get the current (admin) user ID."""
+    return api.get("App/user")["user"]["id"]
+
+
+def seed_emails(api, emails, user_id):
     """Create Emails with threading. Sorts by thread/position to seed parents first."""
     sorted_emails = sorted(emails, key=lambda e: (e["thread_id"], e["thread_position"]))
 
@@ -105,6 +110,7 @@ def seed_emails(api, emails):
             "from": email["from"]["email"],
             "to": ";".join(to_addrs),
             "messageId": f"<{email['id']}@proptech-challenge>",
+            "cChallengeId": email["id"],
         }
 
         if cc_addrs:
@@ -127,6 +133,7 @@ def seed_emails(api, emails):
                     payload["inReplyTo"] = f"<{parent_original['id']}@proptech-challenge>"
 
         created = api.post("Email", payload)
+        api.link("Email", created["id"], "users", user_id)
 
         thread_map.setdefault(email["thread_id"], []).append(created["id"])
         print(f"  Email: {email['id']} \"{email['subject'][:50]}\" → {created['id']}")
@@ -149,7 +156,8 @@ def main():
     print(f"\nCreated {len(senders)} contacts\n")
 
     print("Creating Emails...")
-    seed_emails(api, data["emails"])
+    user_id = get_user_id(api)
+    seed_emails(api, data["emails"], user_id)
 
     print("\nSeed complete.")
 

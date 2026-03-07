@@ -32,3 +32,10 @@ class EspoAPI:
     def delete(self, path):
         r = self.session.delete(f"{self.base_url}/{path}")
         r.raise_for_status()
+
+    def link(self, entity_type, entity_id, link, foreign_id):
+        r = self.session.post(
+            f"{self.base_url}/{entity_type}/{entity_id}/{link}",
+            json={"id": foreign_id},
+        )
+        r.raise_for_status()
