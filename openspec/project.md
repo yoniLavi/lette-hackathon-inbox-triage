@@ -8,7 +8,7 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 - EspoCRM (open-source CRM with email integration, REST API)
 - EspoMCP (MCP server bridging Claude to EspoCRM)
 - Claude Code + Anthropic Agent SDK (agentic AI layer)
-- Node.js (seed scripts, utilities)
+- Python (seed scripts, utilities)
 - TBD: A webUI frontend
 
 ## Project Conventions

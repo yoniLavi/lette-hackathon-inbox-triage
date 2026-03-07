@@ -9,7 +9,7 @@ We need a repeatable way to populate EspoCRM with the challenge dataset (5 prope
   - Accounts for each property (with type, units, manager info)
   - Contacts for each unique sender (linked to their Account where applicable)
   - Emails with correct from/to/cc, timestamps, threading (via `messageId`/`replied`), and read status
-- Both scripts use the EspoCRM REST API with credentials from `.env`
+- Both scripts are Python, using the EspoCRM REST API with credentials from `.env`
 - Add a convenience wrapper that runs reset then seed in sequence
 
 ## Impact

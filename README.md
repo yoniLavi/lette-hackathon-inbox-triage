@@ -27,18 +27,24 @@ The agent processes emails sequentially in work sessions, using EspoCRM as its r
 - **EspoCRM** — open-source CRM with email integration and REST API
 - **EspoMCP** — MCP server bridging Claude to EspoCRM
 - **Claude Code + Anthropic Agent SDK** — agentic AI layer
-- **Node.js** — seed scripts and utilities
+- **Python** — seed scripts and utilities
 
 ## Getting Started
 
-Prerequisites: Docker, Node.js
+Prerequisites: Docker, [uv](https://docs.astral.sh/uv/)
 
 ```bash
 # Start the stack
 docker compose up -d
 
 # Seed test data (100 emails from challenge dataset)
-# TBD
+uv run scripts/seed.py
+
+# Reset CRM to blank state
+uv run scripts/reset.py
+
+# Reset + re-seed in one step
+uv run scripts/reseed.py
 
 # Run the agent
 # TBD
