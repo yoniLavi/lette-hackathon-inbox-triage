@@ -99,6 +99,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 class PromptRequest(BaseModel):
     message: str
+    context: str | None = None  # page context from the frontend
 
 
 class PromptResponse(BaseModel):
@@ -123,19 +124,24 @@ async def prompt(req: PromptRequest) -> PromptResponse:
     _busy = True
     try:
         client = await _ensure_client()
-        await client.query(req.message)
+        prompt = req.message
+        if req.context:
+            prompt = f"[Page context: {req.context}]\n\n{req.message}"
+        await client.query(prompt)
 
         text_parts: list[str] = []
         async for msg in client.receive_response():
             if isinstance(msg, AssistantMessage):
                 for block in msg.content:
-                    if isinstance(block, TextBlock):
+                    if isinstance(block, ToolUseBlock):
+                        text_parts.clear()
+                    elif isinstance(block, TextBlock):
                         text_parts.append(block.text)
 
         _message_count += 1
 
         return PromptResponse(
-            response="\n".join(text_parts) or "(no response)",
+            response="\n\n".join(text_parts) or "(no response)",
             session_id=_session_id or "",
         )
     except HTTPException:
@@ -166,17 +172,30 @@ async def prompt_stream(req: PromptRequest):
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     async def _consume():
-        """Read SDK response and push SSE strings into the queue."""
+        """Read SDK response and push SSE strings into the queue.
+
+        Intermediate TextBlocks (before/between tool calls) are streamed as
+        'progress' events for the status indicator.  Only text after the last
+        tool call is used as the final response.
+        """
         global _message_count
         try:
             client = await _ensure_client()
             log.info("[stream] client ready, session=%s msg_count=%d", _session_id, _message_count)
             await queue.put(_sse_event("status", {"status": "thinking"}))
 
+            # Prepend page context to the user's message on the first turn
+            prompt = req.message
+            if req.context:
+                prompt = f"[Page context: {req.context}]\n\n{req.message}"
+
             log.info("[stream] calling client.query()...")
-            await client.query(req.message)
+            await client.query(prompt)
             log.info("[stream] query() returned, starting receive_response()...")
 
+            # text_parts collects text blocks. On each ToolUseBlock we clear it,
+            # so the done event only contains text after the last tool call.
+            # If no tools are used, all text is the final response.
             text_parts: list[str] = []
             async for msg in client.receive_response():
                 log.info("SDK message: type=%s", type(msg).__name__)
@@ -185,6 +204,8 @@ async def prompt_stream(req: PromptRequest):
                     for block in msg.content:
                         if isinstance(block, ToolUseBlock):
                             log.info("  ToolUseBlock: %s", block.name)
+                            # Discard intermediate text — it's reasoning, not the answer
+                            text_parts.clear()
                             await queue.put(_sse_event("tool_use", {"tool": block.name}))
                         elif isinstance(block, ToolResultBlock):
                             log.info("  ToolResultBlock")
@@ -192,10 +213,11 @@ async def prompt_stream(req: PromptRequest):
                         elif isinstance(block, TextBlock):
                             log.info("  TextBlock: %s...", block.text[:80])
                             text_parts.append(block.text)
+                            # Always send text events — the frontend uses the done event for the final response
                             await queue.put(_sse_event("text", {"text": block.text}))
 
             _message_count += 1
-            await queue.put(_sse_event("done", {"response": "\n".join(text_parts) or "(no response)"}))
+            await queue.put(_sse_event("done", {"response": "\n\n".join(text_parts) or "(no response)"}))
         except Exception as exc:
             log.error("[stream] error: %s", exc)
             await _teardown_client()

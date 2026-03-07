@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { MessageSquare, X, Send, Sparkles, ChevronRight, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -44,7 +45,20 @@ function saveMessages(msgs: Message[]) {
     try { sessionStorage.setItem("lette-chat", JSON.stringify(msgs)); } catch { /* ignore */ }
 }
 
+function usePageContext(): string {
+    const pathname = usePathname();
+    if (pathname === "/") return "User is on the main dashboard, which shows priority queues (Critical/High/Medium/Low cases) and recent email activity.";
+    if (pathname.startsWith("/situations/")) {
+        const id = pathname.split("/").pop();
+        return `User is viewing case/situation detail page (ID: ${id}). They can see the case summary, email communications, tasks, and draft responses.`;
+    }
+    if (pathname === "/properties") return "User is on the Properties page, which lists property accounts.";
+    if (pathname === "/search") return "User is on the Search page.";
+    return `User is on page: ${pathname}`;
+}
+
 export function AIAssistant() {
+    const pageContext = usePageContext();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>(loadMessages);
     const [inputValue, setInputValue] = useState("");
@@ -126,6 +140,8 @@ export function AIAssistant() {
                             setStatusText(data.status === "connecting" ? "Connecting..." : "Thinking...");
                         } else if (currentEvent === "tool_use") {
                             setStatusText(friendlyTool(data.tool));
+                        } else if (currentEvent === "progress") {
+                            setStatusText(data.text || "Working...");
                         } else if (currentEvent === "text") {
                             finalResponse = data.text;
                             setStatusText("Writing...");
@@ -170,7 +186,7 @@ export function AIAssistant() {
         setStatusText("Connecting...");
 
         try {
-            const body = JSON.stringify({ message: text });
+            const body = JSON.stringify({ message: text, context: pageContext });
             const response = await processStream(`${AGENT_URL}/prompt/stream`, body);
 
             setMessages(prev => [...prev, {
