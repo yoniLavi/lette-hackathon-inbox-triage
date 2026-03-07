@@ -1,15 +1,16 @@
 ## 1. Research & Decision
-- [ ] 1.1 Investigate Claude Code SDK capabilities for subagent/task spawning — does `ClaudeSDKClient` support spawning parallel tasks? Can the agent be instructed to use background workers?
-- [ ] 1.2 Measure current tool call latency — profile typical CRM queries (search_entity, get_entity) to establish baseline
-- [ ] 1.3 Decide on approach (Option A / B / C from proposal) based on SDK capabilities and complexity budget
-- [ ] 1.4 If Option A: draft system prompt additions for `agent/workspace/CLAUDE.md` that instruct parallel/batched tool use
-- [ ] 1.5 If Option B: prototype async tool interception in `api.py`
+- [ ] 1.1 Test whether Claude Code SDK supports subagent/task spawning (Agent tool) via ClaudeSDKClient — can we observe subagent progress in receive_response()?
+- [ ] 1.2 If Option A viable: prototype CLAUDE.md instructions for background delegation, verify agent follows them
+- [ ] 1.3 If Option B: prototype a lightweight conversational AI layer (direct Claude API in FastAPI) that dispatches to the Claude Code worker async
+- [ ] 1.4 Decide on approach based on feasibility and complexity
+- [ ] 1.5 Optimize CLAUDE.md to reduce unnecessary CRM queries (single search with high limit, avoid pagination loops)
 
 ## 2. Implementation
 - [ ] 2.1 Implement chosen approach
-- [ ] 2.2 Add SSE events for partial/incremental results if applicable (e.g., `event: partial` with tool output summaries)
+- [ ] 2.2 Ensure user gets an immediate acknowledgment (< 2s) for any query
+- [ ] 2.3 Stream CRM results back to user as they arrive
 
 ## 3. Validation
-- [ ] 3.1 Measure response latency for typical queries before and after
-- [ ] 3.2 Add test to `tests/test_chat_e2e.sh` — CRM query response time under 30s
-- [ ] 3.3 Test that streaming updates appear within 5s of request start
+- [ ] 3.1 Test: user gets a meaningful response within 3s of sending a message
+- [ ] 3.2 Test: CRM data arrives via streaming updates, not blocking the initial response
+- [ ] 3.3 Test: multi-turn conversation still works with the new architecture
