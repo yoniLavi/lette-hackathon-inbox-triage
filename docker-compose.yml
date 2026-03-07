@@ -1,0 +1,42 @@
+services:
+  mariadb:
+    image: mariadb:lts
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    restart: unless-stopped
+
+  espocrm:
+    image: espocrm/espocrm
+    environment:
+      ESPOCRM_DATABASE_HOST: mariadb
+      ESPOCRM_DATABASE_NAME: ${MYSQL_DATABASE}
+      ESPOCRM_DATABASE_USER: ${MYSQL_USER}
+      ESPOCRM_DATABASE_PASSWORD: ${MYSQL_PASSWORD}
+      ESPOCRM_ADMIN_USERNAME: ${ESPOCRM_ADMIN_USERNAME}
+      ESPOCRM_ADMIN_PASSWORD: ${ESPOCRM_ADMIN_PASSWORD}
+      ESPOCRM_SITE_URL: ${ESPOCRM_SITE_URL}
+    ports:
+      - "8080:80"
+    volumes:
+      - espocrm-data:/var/www/html
+    depends_on:
+      - mariadb
+    restart: unless-stopped
+
+  espocrm-daemon:
+    image: espocrm/espocrm
+    entrypoint: docker-daemon.sh
+    volumes:
+      - espocrm-data:/var/www/html
+    depends_on:
+      - espocrm
+    restart: unless-stopped
+
+volumes:
+  mariadb-data:
+  espocrm-data:
