@@ -4,17 +4,17 @@
 TBD - created by archiving change add-agent-container. Update Purpose after archive.
 ## Requirements
 ### Requirement: Agent Container
-The system SHALL provide a Docker container that runs Claude Code in headless mode with access to EspoCRM via the EspoMCP MCP server.
+The agent container SHALL run a persistent FastAPI server instead of one-shot CLI invocations, while keeping the EspoMCP integration and Bedrock authentication.
 
-#### Scenario: Ad-hoc prompt execution
-- **WHEN** a user runs `docker compose run agent "List all emails"`
-- **THEN** Claude Code executes the prompt with EspoMCP tools available
-- **AND** returns the result to stdout
+#### Scenario: Persistent service
+- **WHEN** the agent container starts via `docker compose up`
+- **THEN** the FastAPI server starts and is accessible on port 8001
+- **AND** EspoMCP is available as an MCP tool via the Agent SDK
 
-#### Scenario: EspoCRM connectivity
-- **WHEN** the agent container starts
-- **THEN** it can reach EspoCRM at `http://espocrm` on the Docker network
-- **AND** authenticates via API key
+#### Scenario: Ad-hoc prompt via CLI
+- **WHEN** a user runs `scripts/agent.py "List all emails"`
+- **THEN** the script sends the prompt to the HTTP API
+- **AND** returns the response to stdout
 
 ### Requirement: Bedrock Authentication
 The agent container SHALL authenticate with Claude via AWS Bedrock using a bearer token and configurable region.

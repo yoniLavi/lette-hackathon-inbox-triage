@@ -34,8 +34,11 @@ COPY mcp.json /app/mcp.json
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
+# Agent workspace — CLAUDE.md and skills
+COPY workspace/ /workspace/
+
 # Claude Code needs a home dir for config/sessions
-RUN mkdir -p /home/node/.claude && chown -R node:node /home/node
+RUN mkdir -p /home/node/.claude && chown -R node:node /home/node /workspace
 
 USER node
 WORKDIR /workspace
