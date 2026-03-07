@@ -141,6 +141,77 @@ def seed_emails(api, emails, user_id):
     print(f"Seeded {len(sorted_emails)} emails")
 
 
+def find_emails_by_thread(api, thread_id, emails_data):
+    """Find EspoCRM email IDs for a given thread by matching messageId."""
+    ids = []
+    for email in sorted(emails_data, key=lambda e: e["thread_position"]):
+        if email["thread_id"] != thread_id:
+            continue
+        msg_id = f"<{email['id']}@proptech-challenge>"
+        result = api.get("Email", {
+            "where[0][type]": "equals",
+            "where[0][attribute]": "messageId",
+            "where[0][value]": msg_id,
+            "maxSize": "1",
+        })
+        if result.get("list"):
+            ids.append(result["list"][0]["id"])
+    return ids
+
+
+def seed_cases(api, emails_data, account_map):
+    """Create demo Cases linked to seeded emails."""
+    user_id = get_user_id(api)
+    cases_data = [
+        {
+            "name": "Water Leak - Citynorth Quarter",
+            "priority": "High",
+            "status": "New",
+            "description": "Tenant Eoin Byrne reported a water leak through the bedroom ceiling. Water is actively flowing and damaging property. No contractor has been assigned yet. This is a habitability emergency requiring immediate response.",
+            "accountId": account_map.get("prop_001"),
+            "thread_id": "thread_001",
+            "tasks": [
+                {"name": "Assign emergency plumber", "priority": "Urgent", "description": "Habitability issue — RTB requires emergency response within 24h."},
+                {"name": "Contact tenant to confirm access", "priority": "Normal", "description": "Ensure someone is available to let the contractor in."},
+            ],
+        },
+        {
+            "name": "Heating Issue - Reds Works",
+            "priority": "Normal",
+            "status": "New",
+            "description": "Tenant Emer Crowley reports heating not working for 3 days. Follow-up needed to schedule contractor visit.",
+            "accountId": account_map.get("prop_002"),
+            "thread_id": "thread_003",
+            "tasks": [
+                {"name": "Schedule heating contractor", "priority": "Normal", "description": "Coordinate with contractor for earliest available slot."},
+            ],
+        },
+    ]
+
+    for case_data in cases_data:
+        thread_id = case_data.pop("thread_id")
+        tasks = case_data.pop("tasks")
+        case = api.post("Case", case_data)
+        print(f"  Case: {case_data['name']} → {case['id']}")
+
+        # Link emails from thread
+        email_ids = find_emails_by_thread(api, thread_id, emails_data)
+        for eid in email_ids:
+            try:
+                api.link("Case", case["id"], "emails", eid)
+            except Exception:
+                pass
+
+        # Create tasks
+        for task_data in tasks:
+            task_data["parentType"] = "Case"
+            task_data["parentId"] = case["id"]
+            task_data["status"] = "Not Started"
+            task_data["assignedUserId"] = user_id
+            task = api.post("Task", task_data)
+            print(f"    Task: {task_data['name']} → {task['id']}")
+
+
 def main():
     api = EspoAPI()
     data = load_data()
@@ -158,6 +229,9 @@ def main():
     print("Creating Emails...")
     user_id = get_user_id(api)
     seed_emails(api, data["emails"], user_id)
+
+    print("\nCreating Cases...")
+    seed_cases(api, data["emails"], account_map)
 
     print("\nSeed complete.")
 

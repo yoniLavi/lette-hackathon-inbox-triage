@@ -13,7 +13,7 @@ import subprocess
 
 from espo_api import EspoAPI
 
-ENTITIES = ["Email", "Contact", "Account"]
+ENTITIES = ["Task", "Case", "Email", "Contact", "Account"]
 
 
 def delete_all(api, entity_type):
@@ -40,6 +40,8 @@ def cleanup_db():
         "DELETE FROM email WHERE deleted = 1",
         "DELETE FROM contact WHERE deleted = 1",
         "DELETE FROM account WHERE deleted = 1",
+        "DELETE FROM `case` WHERE deleted = 1",
+        "DELETE FROM task WHERE deleted = 1",
     ])
     subprocess.run(
         [

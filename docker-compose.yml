@@ -51,6 +51,19 @@ services:
       - espocrm
     restart: unless-stopped
 
+  frontend:
+    build: ./frontend
+    environment:
+      NEXT_PUBLIC_AGENT_URL: http://localhost:8001
+      ESPOCRM_URL: http://espocrm
+      ESPOCRM_API_KEY: ${ESPOCRM_API_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - espocrm
+      - agent
+    restart: unless-stopped
+
 volumes:
   mariadb-data:
   espocrm-data:
