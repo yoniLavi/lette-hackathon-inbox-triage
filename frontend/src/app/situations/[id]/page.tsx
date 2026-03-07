@@ -7,6 +7,7 @@ import { mockSituations } from "@/lib/data";
 import { UrgencyBadge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Logo } from "@/components/ui/Logo";
 import { motion } from "framer-motion";
 
 export default function SituationDetail({ params }: { params: { id: string } }) {
@@ -18,24 +19,25 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
             {/* Warmth & Glow Layer */}
             <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#FF8A00] opacity-[0.03] blur-[120px] rounded-full" />
-                <div className="absolute bottom-[20%] left-[-10%] w-[40%] h-[40%] bg-[#0000EE] opacity-[0.02] blur-[120px] rounded-full" />
+                <div className="absolute bottom-[20%] left-[-10%] w-[40%] h-[40%] bg-primary opacity-[0.02] blur-[120px] rounded-full" />
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/soft-wallpaper.png')] opacity-[0.1] mix-blend-overlay" />
             </div>
 
-            <header className="sticky top-0 z-50 bg-[#F7F7F2]/80 backdrop-blur-md">
-                <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-10 flex items-center justify-between">
-                    <Link href="/" className="flex items-center text-[#0F1016]/60 hover:text-[#0000EE] transition-colors bg-[#F2F2EC] hover:bg-[#0000EE]/5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+            <header className="sticky top-0 z-50 bg-[#F7F7F2]/80 backdrop-blur-md pt-4 pb-2">
+                <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-12 flex items-center justify-between">
+                    <Link href="/" className="flex items-center text-[#0F1016]/60 hover:text-primary transition-colors bg-[#F2F2EC] hover:bg-primary/5 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider">
                         <ArrowLeft className="w-3 h-3 mr-1.5" /> Back to Dashboard
                     </Link>
                     <div className="flex gap-3">
-                        <Button variant="secondary" size="fixed" className="px-4 py-1.5 rounded-full shadow-sm text-sm">
+                        <Button variant="secondary" size="fixed" className="px-5 py-2 rounded-full shadow-sm text-sm font-medium">
                             Snooze
                         </Button>
-                        <Button variant="secondary" size="fixed" className="px-4 py-1.5 rounded-full shadow-sm text-sm">
+                        <Button variant="secondary" size="fixed" className="px-5 py-2 rounded-full shadow-sm text-sm font-medium">
                             Edit Details
                         </Button>
-                        <Button size="fixed" className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white px-4 py-1.5 rounded-full shadow-sm text-sm hover:-translate-y-0.5 transition-all">
-                            Close Case
+                        <Button size="fixed" className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white px-5 py-2 rounded-full shadow-sm text-sm font-medium hover:-translate-y-0.5 transition-all relative overflow-hidden group">
+                            <div className="absolute inset-0 opacity-20 bg-striped pointer-events-none group-hover:opacity-30 transition-opacity" />
+                            <span className="relative z-10">Close Case</span>
                         </Button>
                     </div>
                 </div>
@@ -53,8 +55,8 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
                                 <div>
                                     <div className="flex items-center gap-3 mb-2">
                                         <UrgencyBadge tier="CRITICAL">🔴 CRITICAL</UrgencyBadge>
-                                        <span className="text-[10px] font-sans font-bold text-[#0F1016]/60 bg-[#F2F2EC] px-2 py-0.5 rounded uppercase tracking-wider">Maintenance Emergency</span>
-                                        <span className="text-[10px] font-sans font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase tracking-wider border border-emerald-100/50">Status: Open</span>
+                                        <span className="text-[10px] font-sans font-bold text-[#0F1016]/40 uppercase tracking-wider">Maintenance Emergency</span>
+                                        <span className="text-[10px] font-sans font-bold text-emerald-600 uppercase tracking-wider">Status: Open</span>
                                     </div>
                                     <h1 className="text-2xl font-serif font-medium text-[#0F1016] tracking-tight leading-tight">{situation.title}</h1>
                                     <p className="text-[#0F1016]/60 flex items-center mt-1 text-sm font-medium">
@@ -75,13 +77,14 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
 
                         {/* AI Summary */}
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                            <Card className="border-[#0000EE]/20 overflow-hidden shadow-sm relative bg-[#F2F2EC]">
-                                <div className="absolute top-0 left-0 w-1 h-full bg-[#0000EE]"></div>
-                                <div className="bg-[#0000EE]/5 border-b border-[#0000EE]/10 p-3 px-5 flex justify-between items-center">
-                                    <h3 className="font-bold text-[#0000EE] flex items-center text-[10px] tracking-[0.2em] uppercase">
-                                        <Zap className="w-4 h-4 mr-2 text-[#0000EE] fill-[#0000EE]" /> AI Summary & Rationale
+                            <Card className="border-primary/10 overflow-hidden shadow-sm relative bg-[#F2F2EC]">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-primary bg-striped"></div>
+                                <div className="bg-primary/5 border-b border-primary/10 p-3 px-5 flex justify-between items-center group overflow-hidden relative">
+                                    <div className="absolute inset-0 bg-primary opacity-5 bg-striped" />
+                                    <h3 className="font-bold text-primary flex items-center text-[10px] tracking-[0.2em] uppercase relative">
+                                        <Zap className="w-4 h-4 mr-2 text-primary fill-primary" /> AI Summary & Rationale
                                     </h3>
-                                    <button className="text-[10px] font-bold text-[#0F1016]/60 hover:text-[#0F1016] flex items-center bg-white px-2 py-1 rounded-full border border-[#0F1016]/5 uppercase tracking-wider">
+                                    <button className="text-[10px] font-bold text-[#0F1016]/60 hover:text-[#0F1016] flex items-center bg-white px-2 py-1 rounded-full border border-[#0F1016]/5 uppercase tracking-wider relative">
                                         <Edit2 className="w-3 h-3 mr-1" /> Refine
                                     </button>
                                 </div>
@@ -114,9 +117,9 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
                                     </div>
 
                                     <div className="flex gap-2 flex-wrap">
-                                        <span className="bg-rose-100 text-rose-700 text-xs px-2.5 py-1 rounded-full font-medium flex items-center border border-rose-200">Emergency <button className="ml-1 hover:text-rose-900"><X className="w-3 h-3" /></button></span>
-                                        <span className="bg-blue-100 text-blue-700 text-xs px-2.5 py-1 rounded-full font-medium flex items-center border border-blue-200">Water <button className="ml-1 hover:text-blue-900"><X className="w-3 h-3" /></button></span>
-                                        <span className="bg-amber-100 text-amber-700 text-xs px-2.5 py-1 rounded-full font-medium flex items-center border border-amber-200">Property Damage <button className="ml-1 hover:text-amber-900"><X className="w-3 h-3" /></button></span>
+                                        <span className="text-rose-700 text-xs font-semibold flex items-center">Emergency <button className="ml-1 hover:text-rose-900"><X className="w-3 h-3" /></button></span>
+                                        <span className="text-blue-700 text-xs font-semibold flex items-center">Water <button className="ml-1 hover:text-blue-900"><X className="w-3 h-3" /></button></span>
+                                        <span className="text-amber-700 text-xs font-semibold flex items-center">Property Damage <button className="ml-1 hover:text-amber-900"><X className="w-3 h-3" /></button></span>
                                     </div>
                                 </div>
                             </Card>
@@ -128,7 +131,7 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
                                 <h3 className="text-lg font-serif font-medium text-[#0F1016] flex items-center">
                                     Communications <span className="ml-2 bg-[#F2F2EC] text-[#0F1016]/60 text-[10px] px-2 py-0.5 rounded-full font-bold">3</span>
                                 </h3>
-                                <button className="text-[10px] font-bold text-[#0000EE] hover:underline uppercase tracking-wider">
+                                <button className="text-[10px] font-bold text-primary hover:underline uppercase tracking-wider">
                                     Expand All
                                 </button>
                             </div>
@@ -137,7 +140,7 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
                                 <Card className="p-4 border-transparent shadow-sm border-l-4 border-l-[#0F1016]/20 bg-[#F2F2EC]">
                                     <div className="flex justify-between items-start mb-3">
                                         <div className="flex items-center gap-3">
-                                            <div className="bg-[#0000EE]/10 text-[#0000EE] w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs">
+                                            <div className="bg-primary/10 text-primary w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs">
                                                 MS
                                             </div>
                                             <div>
@@ -153,13 +156,13 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
                                     <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
                                         <button className="text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-md transition-colors">Reply</button>
                                         <button className="text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-md transition-colors">Forward</button>
-                                        <button className="text-xs font-semibold text-indigo-600 hover:text-indigo-900 ml-auto flex items-center transition-colors">View in CRM <ArrowLeft className="w-3 h-3 ml-1 rotate-135" /></button>
+                                        <button className="text-xs font-semibold text-primary hover:text-primary/70 ml-auto flex items-center transition-colors">View in CRM <ArrowLeft className="w-3 h-3 ml-1 rotate-135" /></button>
                                     </div>
                                 </Card>
 
                                 <Card className="p-3 border-transparent shadow-sm flex items-center justify-between hover:bg-white/50 cursor-pointer transition-colors border-l-4 border-l-[#0F1016]/10 bg-[#F2F2EC]">
                                     <div className="flex items-center gap-3">
-                                        <div className="bg-[#0000EE]/5 text-[#0000EE]/40 w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs italic">
+                                        <div className="bg-primary/5 text-primary/40 w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs italic">
                                             MS
                                         </div>
                                         <div>
@@ -167,7 +170,7 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
                                             <p className="text-[#0F1016]/60 text-sm italic">"Water leak in Unit 4B"</p>
                                         </div>
                                     </div>
-                                    <span className="text-[10px] text-[#0F1016]/40 font-bold uppercase tracking-wider bg-white/50 px-2 py-1 rounded">Today, 7:15 AM</span>
+                                    <span className="text-[10px] text-[#0F1016]/40 font-bold uppercase tracking-wider">Today, 7:15 AM</span>
                                 </Card>
 
                                 <Card className="p-3 border-slate-200 shadow-sm flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors border-l-4 border-l-emerald-300">
@@ -191,9 +194,10 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
 
                         {/* Recommended Actions */}
                         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }}>
-                            <Card className="border-[#0000EE]/30 shadow-sm overflow-hidden border-2 relative bg-[#F2F2EC]">
-                                <div className="bg-[#0000EE] p-3 px-5 flex justify-between items-center text-white">
-                                    <h3 className="font-bold flex items-center text-[10px] tracking-[0.2em] uppercase">
+                            <Card className="border-transparent shadow-sm overflow-hidden relative bg-[#F2F2EC]">
+                                <div className="bg-primary p-3 px-5 flex justify-between items-center text-white relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-striped opacity-20" />
+                                    <h3 className="font-bold flex items-center text-[10px] tracking-[0.2em] uppercase relative">
                                         <Zap className="w-4 h-4 mr-2 text-white/70 fill-white" /> Recommended Actions
                                     </h3>
                                 </div>
@@ -201,7 +205,7 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
                                     {/* Action 1 */}
                                     <div className="p-4 border-b border-[#0F1016]/5 hover:bg-white/30 transition-colors group">
                                         <div className="flex items-start gap-3">
-                                            <input type="checkbox" className="mt-1 rounded border-[#0F1016]/20 text-[#0000EE] focus:ring-[#0000EE] w-4 h-4 cursor-pointer" />
+                                            <input type="checkbox" className="mt-1 rounded border-[#0F1016]/20 text-primary focus:ring-primary w-4 h-4 cursor-pointer" />
                                             <div className="flex-1">
                                                 <h4 className="font-bold text-[#0F1016] text-sm">Assign emergency plumber</h4>
                                                 <div className="flex text-[10px] font-bold uppercase tracking-wider text-[#0F1016]/60 gap-3 mt-1.5 font-sans">
@@ -222,7 +226,7 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
                                     {/* Action 2 */}
                                     <div className="p-4 border-b border-[#0F1016]/5 hover:bg-white/30 transition-colors group">
                                         <div className="flex items-start gap-3">
-                                            <input type="checkbox" className="mt-1 rounded border-[#0F1016]/20 text-[#0000EE] focus:ring-[#0000EE] w-4 h-4 cursor-pointer" />
+                                            <input type="checkbox" className="mt-1 rounded border-[#0F1016]/20 text-primary focus:ring-primary w-4 h-4 cursor-pointer" />
                                             <div className="flex-1">
                                                 <h4 className="font-bold text-[#0F1016] text-sm">Call tenant to confirm access</h4>
                                                 <div className="flex text-[10px] font-bold uppercase tracking-wider text-[#0F1016]/60 gap-3 mt-1.5 font-sans">
@@ -238,7 +242,7 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
                                     {/* Action 3 */}
                                     <div className="p-4 hover:bg-white/30 transition-colors">
                                         <div className="flex items-start gap-3">
-                                            <input type="checkbox" className="mt-1 rounded border-[#0F1016]/20 text-[#0000EE] focus:ring-[#0000EE] w-4 h-4 cursor-pointer" />
+                                            <input type="checkbox" className="mt-1 rounded border-[#0F1016]/20 text-primary focus:ring-primary w-4 h-4 cursor-pointer" />
                                             <div className="flex-1">
                                                 <h4 className="font-bold text-[#0F1016] text-sm">Notify landlord of emergency repair</h4>
                                                 <div className="flex text-[10px] font-bold uppercase tracking-wider text-[#0F1016]/60 gap-3 mt-1.5 font-sans">
@@ -272,8 +276,9 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
                                     <p>Thank you for bringing this to our urgent attention. I sincerely apologize for the delay in response.</p>
                                     <p>I have immediately assigned an emergency plumber who will contact you within the next 30 minutes to arrange access. Please ensure someone is available to provide entry.</p>
                                     <p>Regarding the damage to your furniture, please document with photos and we will address compensation once the leak is resolved.</p>
-                                    <div className="flex items-center text-[10px] font-bold text-[#0000EE] bg-[#0000EE]/5 p-2 rounded mt-4 border border-[#0000EE]/10 uppercase tracking-wider">
-                                        <BotIcon className="w-3.5 h-3.5 mr-1.5" /> Generated by AI - Please review before sending
+                                    <div className="flex items-center text-[10px] font-bold text-primary bg-primary/5 p-2 rounded mt-4 border border-primary/10 uppercase tracking-wider relative overflow-hidden">
+                                        <div className="absolute inset-0 bg-striped opacity-5" />
+                                        <BotIcon className="w-3.5 h-3.5 mr-1.5 relative" /> <span className="relative">Generated by AI - Please review before sending</span>
                                     </div>
                                 </div>
                                 <div className="p-3 bg-[#0F1016]/5 rounded-b-xl border-t border-[#0F1016]/5 flex justify-between items-center">
@@ -301,7 +306,7 @@ export default function SituationDetail({ params }: { params: { id: string } }) 
                                         <h4 className="text-[10px] font-bold text-[#0F1016]/40 uppercase tracking-[0.2em] mb-1">Property</h4>
                                         <p className="font-bold text-[#0F1016] text-sm">Citynorth Quarter</p>
                                         <p className="text-sm text-[#0F1016]/60 font-medium">204 units • Built 2019</p>
-                                        <a href="#" className="text-[10px] font-bold text-[#0000EE] uppercase tracking-wider hover:underline mt-2 inline-block">View in CRM &rarr;</a>
+                                        <a href="#" className="text-[10px] font-bold text-primary uppercase tracking-wider hover:underline mt-2 inline-block">View in CRM &rarr;</a>
                                     </div>
                                     <div>
                                         <h4 className="text-[10px] font-bold text-[#0F1016]/40 uppercase tracking-[0.2em] mb-1 mt-2">Tenant History</h4>

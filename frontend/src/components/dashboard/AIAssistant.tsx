@@ -2,8 +2,9 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { MessageSquare, X, Send, Sparkles, ChevronRight } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
+import { Logo } from "@/components/ui/Logo";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Message {
     id: string;
@@ -80,8 +81,9 @@ export function AIAssistant() {
                         {/* Header */}
                         <div className="p-6 bg-[#0F1016] text-white flex justify-between items-center">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-[#0000EE] flex items-center justify-center text-white">
-                                    <Sparkles className="w-4 h-4" />
+                                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-striped opacity-20" />
+                                    <Logo iconOnly className="scale-[0.6] relative" />
                                 </div>
                                 <div>
                                     <h3 className="font-sans font-bold text-[16px]">Lette Assistant</h3>
@@ -106,11 +108,12 @@ export function AIAssistant() {
                                     key={msg.id}
                                     className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                                 >
-                                    <div className={`max-w-[85%] rounded-[24px] p-4 ${msg.role === "user"
-                                        ? "bg-[#0000EE] text-white rounded-tr-none"
-                                        : "bg-slate-50 border border-slate-100 text-[#0F1016] rounded-tl-none"
+                                    <div className={`max-w-[85%] rounded-[24px] p-4 relative overflow-hidden ${msg.role === "user"
+                                        ? "bg-primary text-white rounded-tr-none"
+                                        : "bg-[#F2F2EC] border border-[#0F1016]/5 text-[#0F1016] rounded-tl-none"
                                         }`}>
-                                        <p className={`text-[14px] leading-relaxed ${msg.role === "assistant" ? "font-serif" : "font-sans font-medium"}`}>
+                                        {msg.role === "user" && <div className="absolute inset-0 bg-striped opacity-20" />}
+                                        <p className={`text-[14px] leading-relaxed relative ${msg.role === "assistant" ? "font-serif" : "font-sans font-medium"}`}>
                                             {msg.content}
                                         </p>
                                         <span className={`text-[10px] block mt-1 opacity-50 ${msg.role === "user" ? "text-right" : ""}`}>
@@ -130,7 +133,7 @@ export function AIAssistant() {
                                         <button
                                             key={prompt}
                                             onClick={() => handleSend(prompt)}
-                                            className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full text-[12px] font-sans font-medium text-slate-600 transition-all flex items-center group shadow-sm whitespace-nowrap"
+                                            className="px-3 py-1.5 bg-[#F2F2EC] hover:bg-white border border-[#0F1016]/5 rounded-full text-[12px] font-sans font-bold text-[#0F1016]/60 transition-all flex items-center group shadow-sm whitespace-nowrap uppercase tracking-wider"
                                         >
                                             {prompt}
                                             <ChevronRight className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -151,14 +154,15 @@ export function AIAssistant() {
                                     value={inputValue}
                                     onChange={(e) => setInputValue(e.target.value)}
                                     placeholder="Ask anything about your tasks..."
-                                    className="w-full pl-5 pr-14 py-4 bg-slate-50 border border-slate-200 rounded-full text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0000EE]/20 focus:border-[#0000EE] transition-all placeholder:text-slate-400 font-sans"
+                                    className="w-full pl-5 pr-14 py-4 bg-[#F2F2EC] border border-[#0F1016]/5 rounded-full text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-[#0F1016]/30 font-sans italic"
                                 />
                                 <button
                                     type="submit"
                                     disabled={!inputValue.trim()}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#0000EE] text-white rounded-full flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#0000CC] transition-all"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/90 transition-all shadow-md relative overflow-hidden"
                                 >
-                                    <Send className="w-4 h-4" />
+                                    <div className="absolute inset-0 bg-striped opacity-20" />
+                                    <Send className="w-4 h-4 relative" />
                                 </button>
                             </form>
                         </div>
@@ -169,8 +173,8 @@ export function AIAssistant() {
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl border border-slate-200 transition-all duration-300 ${isOpen
-                        ? "bg-white rotate-90 scale-90"
-                        : "bg-[#F8F8F6] hover:bg-white hover:scale-110 hover:shadow-2xl"
+                    ? "bg-white rotate-90 scale-90"
+                    : "bg-[#F8F8F6] hover:bg-white hover:scale-110 hover:shadow-2xl"
                     }`}
             >
                 {isOpen ? (
@@ -178,7 +182,7 @@ export function AIAssistant() {
                 ) : (
                     <div className="relative">
                         <MessageSquare className="w-8 h-8 text-[#0F1016] fill-[#0F1016]/5" />
-                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#0000EE] rounded-full border-4 border-[#F8F8F6] z-10" />
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary bg-striped rounded-full border-4 border-[#F7F7F2] z-10" />
                     </div>
                 )}
             </button>

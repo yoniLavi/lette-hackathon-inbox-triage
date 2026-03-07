@@ -28,7 +28,7 @@ export function QuickStats() {
                 <StatCard
                     label="Action Needed"
                     value="08"
-                    color="text-[#0000EE]"
+                    color="text-primary"
                 />
                 <StatCard
                     label="Resolved"
@@ -58,7 +58,7 @@ export function QuickStats() {
             <div className="bg-[#F2F2EC] rounded-[20px] p-4">
                 <div className="flex justify-between items-center mb-3">
                     <h3 className="text-[10px] font-sans font-bold text-[#0F1016]/40 uppercase tracking-[0.2em]">Properties</h3>
-                    <Link href="/properties" className="text-[10px] font-sans font-bold text-[#0000EE] uppercase tracking-wider hover:underline">View All</Link>
+                    <Link href="/properties" className="text-[10px] font-sans font-bold text-primary uppercase tracking-wider hover:underline">View All</Link>
                 </div>
                 <ul className="space-y-2">
                     {[
@@ -70,8 +70,9 @@ export function QuickStats() {
                             <Link href="/properties" className="flex justify-between items-center text-[12px] font-sans font-medium text-[#0F1016] border-b border-black/5 pb-2 hover:border-black/20 transition-all group">
                                 <span className="truncate group-hover:translate-x-1 transition-transform">{prop.name}</span>
                                 {prop.crit > 0 && (
-                                    <span className="bg-[#0000EE] text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold">
-                                        {prop.crit}
+                                    <span className="bg-primary text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold relative overflow-hidden flex items-center justify-center">
+                                        <div className="absolute inset-0 bg-striped opacity-20" />
+                                        <span className="relative z-10">{prop.crit}</span>
                                     </span>
                                 )}
                             </Link>

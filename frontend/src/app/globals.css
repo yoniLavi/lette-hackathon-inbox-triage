@@ -3,7 +3,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-primary: #0000EE;
+  --color-primary: #2C3BFF;
   --color-accent: #0F1016;
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-tiempos), ui-serif, Georgia, serif;
@@ -11,8 +11,20 @@
 }
 
 :root {
-  --background: #EDEDE9;
+  --background: #F7F7F2;
   --foreground: #0F1016;
+}
+
+.bg-striped {
+  background-image: linear-gradient(-45deg,
+      rgba(255, 255, 255, 1) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 1) 50%,
+      rgba(255, 255, 255, 1) 75%,
+      transparent 75%,
+      transparent);
+  background-size: 8px 8px;
 }
 
 body {

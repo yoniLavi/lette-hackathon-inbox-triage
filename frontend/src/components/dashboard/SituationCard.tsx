@@ -12,7 +12,7 @@ export function SituationCard({ situation }: { situation: Situation }) {
     const urgencyStyles = {
         CRITICAL: { dot: "bg-red-500" },
         HIGH: { dot: "bg-amber-500" },
-        MEDIUM: { dot: "bg-[#0000EE]" },
+        MEDIUM: { dot: "bg-primary" },
         LOW: { dot: "bg-[#0F1016]/20" }
     };
 
@@ -33,7 +33,7 @@ export function SituationCard({ situation }: { situation: Situation }) {
                             {/* Header Info */}
                             <div className="flex justify-between items-start">
                                 <div className="space-y-0.5">
-                                    <h3 className="text-[18px] font-serif font-medium text-[#0F1016] leading-tight group-hover:text-[#0000EE] transition-colors">
+                                    <h3 className="text-[18px] font-serif font-medium text-[#0F1016] leading-tight group-hover:text-primary transition-colors">
                                         {situation.title}
                                     </h3>
                                     <div className="flex items-center gap-2 text-[10px] font-sans font-bold text-[#0F1016]/40 uppercase tracking-[0.15em]">
@@ -47,8 +47,8 @@ export function SituationCard({ situation }: { situation: Situation }) {
                             {/* AI Summary Box - Tightened */}
                             <div className="bg-white/50 border border-white/40 p-3 rounded-[14px]">
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <Sparkles className="w-3 h-3 text-[#0000EE]" />
-                                    <span className="text-[9px] font-sans font-bold text-[#0000EE] uppercase tracking-widest">Lette Summary</span>
+                                    <Sparkles className="w-3 h-3 text-primary" />
+                                    <span className="text-[9px] font-sans font-bold text-primary uppercase tracking-widest">Lette Summary</span>
                                 </div>
                                 <p className="text-[13px] font-serif text-[#0F1016] leading-snug">
                                     {situation.aiSummary}

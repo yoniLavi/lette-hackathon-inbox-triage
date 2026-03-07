@@ -8,7 +8,7 @@ import { MessageSquare, User, ShieldCheck } from "lucide-react";
 export function ActivityCard({ activity }: { activity: Activity }) {
     const getIcon = () => {
         switch (activity.type) {
-            case "email": return <MessageSquare className="w-3.5 h-3.5 text-[#0000EE]" />;
+            case "email": return <MessageSquare className="w-3.5 h-3.5 text-primary" />;
             case "agent": return <User className="w-3.5 h-3.5 text-emerald-500" />;
             case "system": return <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />;
             default: return <MessageSquare className="w-3.5 h-3.5 text-[#0F1016]/40" />;

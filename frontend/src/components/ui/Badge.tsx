@@ -11,7 +11,7 @@ interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 const tierStyles: Record<BadgeTier, string> = {
     CRITICAL: "bg-red-50 border-red-200 text-red-600",
     HIGH: "bg-amber-50 border-amber-200 text-amber-600",
-    MEDIUM: "bg-blue-50 border-blue-200 text-blue-600",
+    MEDIUM: "bg-primary/10 border-primary/20 text-primary",
     LOW: "bg-slate-50 border-slate-200 text-slate-600",
 };
 
@@ -19,7 +19,7 @@ export function UrgencyBadge({ tier, className, children, ...props }: BadgeProps
     return (
         <div
             className={cn(
-                "inline-flex items-center rounded-lg border px-3 py-1 text-[13px] font-sans font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#0000EE]",
+                "inline-flex items-center rounded-lg border px-3 py-1 text-[13px] font-sans font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-primary",
                 tierStyles[tier],
                 className
             )}

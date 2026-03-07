@@ -5,10 +5,12 @@ import Link from "next/link";
 import { mockSituations, mockActivities } from "@/lib/data";
 import { SituationCard } from "@/components/dashboard/SituationCard";
 import { ActivityCard } from "@/components/dashboard/ActivityCard";
+import { ActionCard } from "@/components/dashboard/ActionCard";
 import { QuickStats } from "@/components/dashboard/QuickStats";
 import { AIAssistant } from "@/components/dashboard/AIAssistant";
 import { ChevronDown, ChevronRight, Inbox, Bell, Settings, Search, User, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Logo } from "@/components/ui/Logo";
 import { motion } from "framer-motion";
 
 export default function Dashboard() {
@@ -41,7 +43,7 @@ export default function Dashboard() {
       {/* Warmth & Glow Layer */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#FF8A00] opacity-[0.03] blur-[120px] rounded-full" />
-        <div className="absolute bottom-[20%] left-[-10%] w-[40%] h-[40%] bg-[#0000EE] opacity-[0.02] blur-[120px] rounded-full" />
+        <div className="absolute bottom-[20%] left-[-10%] w-[40%] h-[40%] bg-primary opacity-[0.02] blur-[120px] rounded-full" />
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/soft-wallpaper.png')] opacity-[0.1] mix-blend-overlay" />
       </div>
 
@@ -49,10 +51,7 @@ export default function Dashboard() {
       <nav className="w-full flex justify-center px-4 md:px-12 py-8">
         <div className="max-w-7xl w-full flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-[#0F1016]">
-              <path d="M12 2L4 7V17L12 22L20 17V7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="font-sans font-black text-[#0F1016] text-[22px] tracking-tight">Lette</span>
+            <Logo />
           </div>
 
           <div className="flex items-center gap-3">
