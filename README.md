@@ -34,13 +34,25 @@ The agent processes emails sequentially in work sessions, using EspoCRM as its r
 Prerequisites: Docker, [uv](https://docs.astral.sh/uv/)
 
 ```bash
-# Start the stack
+# 1. Start the stack
 docker compose up -d
 
-# Seed test data (100 emails from challenge dataset)
+# 2. Wait for EspoCRM to finish initializing (~30s on first run)
+#    Check with: docker compose logs -f espocrm
+
+# 3. Seed test data (100 emails, 82 contacts, 5 accounts)
 uv run scripts/seed.py
 
-# Reset CRM to blank state
+# 4. Open EspoCRM at http://localhost:8080
+#    Login: admin / admin123
+#    Emails are under the "All" folder: Emails → All
+#    (direct link: http://localhost:8080/#Email/list/folder=all)
+```
+
+### Other commands
+
+```bash
+# Reset CRM to blank state (deletes all Emails, Contacts, Accounts)
 uv run scripts/reset.py
 
 # Reset + re-seed in one step
@@ -57,6 +69,11 @@ Built for **BTR/PRS property management** in Ireland (Build-to-Rent / Private Re
 ## Project Structure
 
 ```
+scripts/                # Python seed/reset scripts (run with uv)
+  espo_api.py           # Shared EspoCRM API wrapper
+  seed.py               # Seed CRM with challenge dataset
+  reset.py              # Delete all seeded data
+  reseed.py             # Reset + seed in one step
 challenge-definition/   # Challenge brief and test data (100 emails JSON)
 openspec/               # Spec-driven development (proposals, specs, tasks)
 ```

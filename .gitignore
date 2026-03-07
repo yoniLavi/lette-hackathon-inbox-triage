@@ -1,2 +1,5 @@
 .env
 __pycache__/
+temporary-scripts/
+.playwright-cli/
+.vscode/
