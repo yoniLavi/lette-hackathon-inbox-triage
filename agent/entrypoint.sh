@@ -1,12 +1,12 @@
 #!/bin/sh
 set -e
 
-if [ $# -eq 0 ]; then
-  echo "Usage: docker compose run agent \"<prompt>\""
-  echo "Example: docker compose run agent \"List all emails in the CRM\""
-  exit 1
+# If arguments are passed, run one-shot CLI mode (backwards compat)
+if [ $# -gt 0 ]; then
+  exec claude -p "$*" \
+    --mcp-config /app/mcp.json \
+    --dangerously-skip-permissions
 fi
 
-exec claude -p "$*" \
-  --mcp-config /app/mcp.json \
-  --dangerously-skip-permissions
+# Default: start the FastAPI server
+cd /app && exec uv run uvicorn api:app --host 0.0.0.0 --port 8001

@@ -45,10 +45,11 @@ services:
       AWS_REGION: ${AWS_REGION}
       ESPOCRM_API_KEY: ${ESPOCRM_API_KEY}
       ESPOCRM_INTERNAL_URL: http://espocrm
+    ports:
+      - "8001:8001"
     depends_on:
       - espocrm
-    profiles:
-      - agent
+    restart: unless-stopped
 
 volumes:
   mariadb-data:
