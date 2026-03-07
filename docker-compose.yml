@@ -37,6 +37,19 @@ services:
       - espocrm
     restart: unless-stopped
 
+  agent:
+    build: ./agent
+    environment:
+      CLAUDE_CODE_USE_BEDROCK: ${CLAUDE_CODE_USE_BEDROCK}
+      AWS_BEARER_TOKEN_BEDROCK: ${AWS_BEARER_TOKEN_BEDROCK}
+      AWS_REGION: ${AWS_REGION}
+      ESPOCRM_API_KEY: ${ESPOCRM_API_KEY}
+      ESPOCRM_INTERNAL_URL: http://espocrm
+    depends_on:
+      - espocrm
+    profiles:
+      - agent
+
 volumes:
   mariadb-data:
   espocrm-data:

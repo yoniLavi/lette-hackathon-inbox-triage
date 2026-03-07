@@ -18,6 +18,10 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 - Prefer simple scripts over frameworks
 - Keep dependencies minimal
 
+### Scripts
+- All Python scripts in `scripts/` use a `uv` shebang (`#!/usr/bin/env -S uv run --script`) so they can be run directly: `scripts/agent.py "prompt"` (no `uv run` prefix needed)
+- Key scripts: `scripts/agent.py` (run agent prompts), `scripts/espo_cli.py` (EspoCRM REST API), `scripts/seed.py`, `scripts/reset.py`, `scripts/reseed.py`, `scripts/create_api_user.py`
+
 ### Architecture Patterns
 - **Agentic loop**: Claude processes emails one at a time from the CRM inbox, using EspoCRM as its read/write tool via MCP, as part of a work session
 - **Session-based processing**: emails processed in work sessions (e.g. 100 emails per session), drafts prepared during session, "sent" (status change) at end of session

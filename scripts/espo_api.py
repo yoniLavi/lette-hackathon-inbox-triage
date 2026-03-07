@@ -29,6 +29,12 @@ class EspoAPI:
             raise RuntimeError(f"POST {path} {r.status_code}: {r.text}")
         return r.json()
 
+    def put(self, path, data):
+        r = self.session.put(f"{self.base_url}/{path}", json=data)
+        if not r.ok:
+            raise RuntimeError(f"PUT {path} {r.status_code}: {r.text}")
+        return r.json()
+
     def delete(self, path):
         r = self.session.delete(f"{self.base_url}/{path}")
         r.raise_for_status()
