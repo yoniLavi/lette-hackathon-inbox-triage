@@ -39,6 +39,9 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 - Irish regulatory context: RTB (Residential Tenancies Board), RPZ (Rent Pressure Zones), gas safety certs, fire safety regulations
 - Property managers referenced by first name in emails (but names don't always match — e.g., "Sarah Brennan" signs as "Tara")
 
+## Frontend Integration
+A colleague is building a Next.js frontend in `frontend/`. Integration between the frontend and the agent/CRM backend is not yet in scope — current focus is on the email triage automation. Frontend integration will come later.
+
 ## Important Constraints
 - Hackathon time constraint: must be demoable quickly
 - 100 test emails provided as JSON (challenge-definition/proptech-test-data.json)
