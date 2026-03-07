@@ -20,11 +20,7 @@ from claude_code_sdk.types import (
 # SDK options (shared across sessions)
 # ---------------------------------------------------------------------------
 SDK_OPTIONS = ClaudeCodeOptions(
-    system_prompt=(
-        "You are a PropTech email triage agent for a property management company. "
-        "You have access to EspoCRM via MCP tools. Use them to read and manage "
-        "emails, contacts, accounts, and cases. Be concise and action-oriented."
-    ),
+    cwd="/workspace",
     mcp_servers={
         "espocrm": McpStdioServerConfig(
             command="node",
