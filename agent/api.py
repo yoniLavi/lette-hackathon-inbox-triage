@@ -47,6 +47,8 @@ SDK_OPTIONS = ClaudeCodeOptions(
 # ---------------------------------------------------------------------------
 # Session state
 # ---------------------------------------------------------------------------
+_RESPONSE_TIMEOUT = 90  # seconds — tear down session if SDK goes silent
+
 _client: ClaudeSDKClient | None = None
 _session_id: str | None = None
 _message_count: int = 0
@@ -190,34 +192,44 @@ async def prompt_stream(req: PromptRequest):
                 prompt = f"[Page context: {req.context}]\n\n{req.message}"
 
             log.info("[stream] calling client.query()...")
-            await client.query(prompt)
+            await asyncio.wait_for(client.query(prompt), timeout=_RESPONSE_TIMEOUT)
             log.info("[stream] query() returned, starting receive_response()...")
 
             # text_parts collects text blocks. On each ToolUseBlock we clear it,
             # so the done event only contains text after the last tool call.
             # If no tools are used, all text is the final response.
             text_parts: list[str] = []
-            async for msg in client.receive_response():
-                log.info("SDK message: type=%s", type(msg).__name__)
-                if isinstance(msg, AssistantMessage):
-                    log.info("  AssistantMessage blocks: %s", [type(b).__name__ for b in msg.content])
-                    for block in msg.content:
-                        if isinstance(block, ToolUseBlock):
-                            log.info("  ToolUseBlock: %s", block.name)
-                            # Discard intermediate text — it's reasoning, not the answer
-                            text_parts.clear()
-                            await queue.put(_sse_event("tool_use", {"tool": block.name}))
-                        elif isinstance(block, ToolResultBlock):
-                            log.info("  ToolResultBlock")
-                            await queue.put(_sse_event("tool_result", {"tool": getattr(block, "name", "")}))
-                        elif isinstance(block, TextBlock):
-                            log.info("  TextBlock: %s...", block.text[:80])
-                            text_parts.append(block.text)
-                            # Always send text events — the frontend uses the done event for the final response
-                            await queue.put(_sse_event("text", {"text": block.text}))
+            # Resetting deadline: each SDK message pushes it forward,
+            # so long multi-tool sequences that make progress won't time out.
+            loop = asyncio.get_event_loop()
+            cm = asyncio.timeout_at(loop.time() + _RESPONSE_TIMEOUT)
+            async with cm:
+                async for msg in client.receive_response():
+                    cm.reschedule(loop.time() + _RESPONSE_TIMEOUT)
+                    log.info("SDK message: type=%s", type(msg).__name__)
+                    if isinstance(msg, AssistantMessage):
+                        log.info("  AssistantMessage blocks: %s", [type(b).__name__ for b in msg.content])
+                        for block in msg.content:
+                            if isinstance(block, ToolUseBlock):
+                                log.info("  ToolUseBlock: %s", block.name)
+                                # Discard intermediate text — it's reasoning, not the answer
+                                text_parts.clear()
+                                await queue.put(_sse_event("tool_use", {"tool": block.name}))
+                            elif isinstance(block, ToolResultBlock):
+                                log.info("  ToolResultBlock")
+                                await queue.put(_sse_event("tool_result", {"tool": getattr(block, "name", "")}))
+                            elif isinstance(block, TextBlock):
+                                log.info("  TextBlock: %s...", block.text[:80])
+                                text_parts.append(block.text)
+                                # Always send text events — the frontend uses the done event for the final response
+                                await queue.put(_sse_event("text", {"text": block.text}))
 
             _message_count += 1
             await queue.put(_sse_event("done", {"response": "\n\n".join(text_parts) or "(no response)"}))
+        except TimeoutError:
+            log.error("[stream] timeout — no SDK messages for %ds", _RESPONSE_TIMEOUT)
+            await _teardown_client()
+            await queue.put(_sse_event("error", {"detail": f"Response timed out after {_RESPONSE_TIMEOUT}s. Please try again."}))
         except Exception as exc:
             log.error("[stream] error: %s", exc)
             await _teardown_client()
