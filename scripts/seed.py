@@ -9,6 +9,8 @@
 """Seed EspoCRM with challenge dataset: properties → Accounts, senders → Contacts, emails → Emails."""
 
 import json
+import os
+import subprocess
 from pathlib import Path
 
 from espo_api import EspoAPI
@@ -159,7 +161,32 @@ def main():
     user_id = get_user_id(api)
     seed_emails(api, data["emails"], user_id)
 
+    print("\nMoving emails to inbox...")
+    move_emails_to_inbox()
+
     print("\nSeed complete.")
+
+
+def move_emails_to_inbox():
+    """Set folder_id='inbox' on all email_user rows via SQL.
+
+    EspoCRM's API doesn't expose a way to set the per-user folder for
+    emails, but the inbox view filters on this column. We go through
+    the database directly since these are seed scripts for local dev.
+    """
+    db_user = os.environ.get("MYSQL_USER", "espocrm")
+    db_pass = os.environ.get("MYSQL_PASSWORD", "espocrm_password")
+    db_name = os.environ.get("MYSQL_DATABASE", "espocrm")
+    subprocess.run(
+        [
+            "docker", "compose", "exec", "-T", "mariadb",
+            "mariadb", f"-u{db_user}", f"-p{db_pass}", db_name,
+            "-e", "UPDATE email_user SET folder_id = 'inbox' WHERE folder_id IS NULL;",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    print("  Done — emails moved to inbox")
 
 
 if __name__ == "__main__":
