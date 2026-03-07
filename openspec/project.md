@@ -44,10 +44,10 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 - 100 test emails provided as JSON (challenge-definition/proptech-test-data.json)
 - Agent must process emails sequentially, building context as it goes
 - Draft responses held until end of session, updated as new context arrives
-- Claude Max account for auth
+- Claude account (we could use Claude Max for the development, and will switch to API key later)
 
 ## External Dependencies
 - EspoCRM Docker image (espocrm/espocrm)
 - MariaDB Docker image
 - EspoMCP npm package (github.com/zaphod-black/espomcp)
-- Anthropic Claude API (via Claude Max)
+- Anthropic Claude API (API key / Claude Max)
