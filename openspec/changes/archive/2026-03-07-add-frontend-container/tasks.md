@@ -4,7 +4,7 @@
 
 ## 2. Docker Compose
 - [x] 2.1 Add `frontend` service to `docker-compose.yml` — build from `./frontend`, expose port 3000, pass env vars
-- [ ] 2.2 Add env vars to `.env.example`: `NEXT_PUBLIC_AGENT_URL`, `ESPOCRM_URL`, `ESPOCRM_API_KEY`
+- [x] 2.2 Add env vars to `.env.example`: `NEXT_PUBLIC_AGENT_URL`, `ESPOCRM_URL`, `ESPOCRM_API_KEY`
 
 ## 3. Next.js Config
 - [x] 3.1 Update `frontend/next.config.ts` — set `output: "standalone"` for Docker-optimized builds

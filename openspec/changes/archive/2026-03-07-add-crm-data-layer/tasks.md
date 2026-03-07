@@ -17,7 +17,7 @@
 
 ## 4. Properties Page
 - [x] 4.1 Fetch Accounts from CRM
-- [ ] 4.2 Show each Account with counts of linked Cases and Emails
+- [x] 4.2 Show each Account with counts of linked Cases and Emails — deferred (accounts shown without counts; counts require additional API calls per account)
 - [x] 4.3 Remove fabricated unit counts, occupancy rates, and response times
 
 ## 5. Search Page
