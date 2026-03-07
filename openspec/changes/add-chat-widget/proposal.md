@@ -1,15 +1,18 @@
-# Change: Wire the AI chat widget to the agent API
+# Change: Wire the AI chat widget to the agent API with SSE streaming
 
 ## Why
-The frontend has a floating chat assistant (`AIAssistant.tsx`) that currently returns hardcoded mock responses. Wiring it to the agent's `POST /prompt` endpoint makes it a real conversational interface to the CRM-connected agent.
+The frontend has a floating chat assistant (`AIAssistant.tsx`) that needs to be a real conversational interface to the CRM-connected agent. Long-running tool calls (10-60s) require streaming progress so users aren't left staring at "Thinking...". Multi-turn conversations are essential for useful chat but currently hang due to a Claude Code SDK issue.
 
 ## What Changes
-- Update `AIAssistant.tsx` to call `POST /prompt` on the agent API instead of using `setTimeout` with fake responses
-- Add loading/typing indicator while the agent is processing
-- Handle 409 (agent busy) with a user-friendly message
-- Add CORS support to the agent API so the browser can reach it directly
-- Agent URL configured via `NEXT_PUBLIC_AGENT_URL` environment variable
+- `AIAssistant.tsx` calls `POST /prompt/stream` (SSE) instead of the non-streaming `/prompt`
+- Live status updates: tool names shown as the agent works, markdown rendering for responses
+- "New Chat" button resets the session; messages persist via sessionStorage
+- Agent API: `POST /prompt/stream` yields SSE events (`status`, `tool_use`, `text`, `done`, `error`)
+- Agent API: early SSE yields before slow SDK calls to flush HTTP headers immediately
+- **Bug fix needed:** Claude Code SDK `receive_response()` hangs on second turn — needs investigation and fix
+- **Bug fix needed:** per-request timeout to prevent silent hangs
 
 ## Impact
-- Affected specs: `frontend-app` (chat widget behavior), `agent-api` (CORS)
+- Affected specs: `frontend-app` (chat widget), `agent-api` (streaming endpoint, session management)
 - Affected code: `frontend/src/components/dashboard/AIAssistant.tsx`, `agent/api.py`
+- Key risk: Claude Code SDK multi-turn sessions may require a different API pattern than currently used

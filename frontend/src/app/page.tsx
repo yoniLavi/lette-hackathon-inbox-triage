@@ -9,6 +9,7 @@ import { QuickStats } from "@/components/dashboard/QuickStats";
 import { AIAssistant } from "@/components/dashboard/AIAssistant";
 import { Plus, User } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Logo } from "@/components/ui/Logo";
 import { motion } from "framer-motion";
 
 // Map CRM priority to urgency tier
@@ -67,12 +68,7 @@ export default function Dashboard() {
 
             <nav className="w-full flex justify-center px-4 md:px-12 py-8">
                 <div className="max-w-7xl w-full flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-[#0F1016]">
-                            <path d="M12 2L4 7V17L12 22L20 17V7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                        <span className="font-sans font-black text-[#0F1016] text-[22px] tracking-tight">Lette</span>
-                    </div>
+                    <Logo />
                     <div className="flex items-center gap-3">
                         <Button className="h-9 px-5 rounded-full bg-[#0F1016] text-white hover:bg-black text-[12px] font-sans font-bold shadow-lg transition-all hidden md:flex">
                             <Plus size={16} className="mr-2" />
@@ -151,7 +147,7 @@ export default function Dashboard() {
                                         title: `${email.from || "Unknown"}`,
                                         description: email.name,
                                         timestamp: new Date(email.dateSent),
-                                    }} />
+                                    }} body={email.bodyPlain || email.body} />
                                 ))}
                                 {emails.length === 0 && <p className="text-sm text-slate-400 italic">No recent emails</p>}
                             </div>

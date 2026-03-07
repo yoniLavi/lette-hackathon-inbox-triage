@@ -52,11 +52,16 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
     environment:
       NEXT_PUBLIC_AGENT_URL: http://localhost:8001
       ESPOCRM_URL: http://espocrm
       ESPOCRM_API_KEY: ${ESPOCRM_API_KEY}
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
     ports:
       - "3000:3000"
     depends_on:
@@ -67,3 +72,4 @@ services:
 volumes:
   mariadb-data:
   espocrm-data:
+  frontend-node-modules:

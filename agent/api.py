@@ -1,12 +1,18 @@
 """Agent API — thin FastAPI wrapper around Claude Code SDK with EspoMCP."""
 
 import asyncio
+import json
+import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
 
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("agent")
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from claude_code_sdk import ClaudeSDKClient
@@ -15,6 +21,8 @@ from claude_code_sdk.types import (
     ClaudeCodeOptions,
     McpStdioServerConfig,
     TextBlock,
+    ToolUseBlock,
+    ToolResultBlock,
 )
 
 # ---------------------------------------------------------------------------
@@ -43,7 +51,6 @@ _client: ClaudeSDKClient | None = None
 _session_id: str | None = None
 _message_count: int = 0
 _busy: bool = False
-_lock = asyncio.Lock()
 
 
 async def _ensure_client() -> ClaudeSDKClient:
@@ -102,16 +109,18 @@ class PromptResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+def _sse_event(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
 @app.post("/prompt")
 async def prompt(req: PromptRequest) -> PromptResponse:
     global _busy, _message_count
 
     if _busy:
-        raise HTTPException(status_code=409, detail="A prompt is already being processed")
+        raise HTTPException(status_code=409, detail="Agent is busy with another request.")
 
-    async with _lock:
-        _busy = True
-
+    _busy = True
     try:
         client = await _ensure_client()
         await client.query(req.message)
@@ -129,16 +138,65 @@ async def prompt(req: PromptRequest) -> PromptResponse:
             response="\n".join(text_parts) or "(no response)",
             session_id=_session_id or "",
         )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await _teardown_client()
+        raise HTTPException(status_code=500, detail=str(exc))
     finally:
-        async with _lock:
+        _busy = False
+
+
+@app.post("/prompt/stream")
+async def prompt_stream(req: PromptRequest):
+    """SSE streaming endpoint — sends tool_use, text, and done events."""
+    global _busy
+
+    if _busy:
+        raise HTTPException(status_code=409, detail="Agent is busy with another request.")
+
+    _busy = True
+
+    async def generate():
+        global _busy, _message_count
+        try:
+            yield _sse_event("status", {"status": "connecting"})
+            client = await _ensure_client()
+            yield _sse_event("status", {"status": "thinking"})
+            await client.query(req.message)
+
+            text_parts: list[str] = []
+            async for msg in client.receive_response():
+                log.info("SDK message: type=%s", type(msg).__name__)
+                if isinstance(msg, AssistantMessage):
+                    log.info("  AssistantMessage blocks: %s", [type(b).__name__ for b in msg.content])
+                    for block in msg.content:
+                        if isinstance(block, ToolUseBlock):
+                            log.info("  ToolUseBlock: %s", block.name)
+                            yield _sse_event("tool_use", {"tool": block.name})
+                        elif isinstance(block, ToolResultBlock):
+                            log.info("  ToolResultBlock")
+                            yield _sse_event("tool_result", {"tool": getattr(block, "name", "")})
+                        elif isinstance(block, TextBlock):
+                            log.info("  TextBlock: %s...", block.text[:80])
+                            text_parts.append(block.text)
+                            yield _sse_event("text", {"text": block.text})
+
+            _message_count += 1
+            yield _sse_event("done", {"response": "\n".join(text_parts) or "(no response)"})
+        except Exception as exc:
+            await _teardown_client()
+            yield _sse_event("error", {"detail": str(exc)})
+        finally:
             _busy = False
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 @app.post("/session/restart")
 async def restart_session():
-    async with _lock:
-        global _busy
-        _busy = False
+    global _busy
+    _busy = False
     await _teardown_client()
     return {"status": "restarted"}
 

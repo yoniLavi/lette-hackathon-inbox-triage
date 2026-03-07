@@ -30,11 +30,43 @@ function tierLabel(tier: string) {
     }
 }
 
-function initials(email: string): string {
+function initials(email: string | null | undefined): string {
+    if (!email) return "??";
     const name = email.split("@")[0].replace(/[._-]/g, " ");
     const parts = name.split(" ").filter(Boolean);
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return name.slice(0, 2).toUpperCase();
+}
+
+function EmailCard({ email, isFirst }: { email: CrmEmail; isFirst: boolean }) {
+    const [expanded, setExpanded] = useState(false);
+    const bodyText = (email.bodyPlain || email.body || "").replace(/<[^>]*>/g, '');
+    return (
+        <Card
+            className={`p-4 border-transparent shadow-sm border-l-4 cursor-pointer transition-all ${isFirst ? "border-l-[#0F1016]/20 bg-[#F2F2EC]" : "border-l-[#0F1016]/10 bg-[#F2F2EC]"} hover:shadow-md`}
+            onClick={() => setExpanded(!expanded)}
+        >
+            <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-3">
+                    <div className="bg-[#0000EE]/10 text-[#0000EE] w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs">
+                        {initials(email.from)}
+                    </div>
+                    <div>
+                        <p className="font-bold text-[#0F1016] text-sm">{email.from || "Unknown sender"}</p>
+                        <p className="text-[#0F1016]/80 text-sm font-medium">{email.name}</p>
+                    </div>
+                </div>
+                <span className="text-[10px] text-[#0F1016]/40 font-bold uppercase tracking-wider" suppressHydrationWarning>
+                    {formatDistanceToNow(new Date(email.dateSent), { addSuffix: true })}
+                </span>
+            </div>
+            {bodyText && (
+                <div className={`bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-700 font-sans leading-relaxed whitespace-pre-line ${expanded ? "" : "line-clamp-4"}`}>
+                    {bodyText}
+                </div>
+            )}
+        </Card>
+    );
 }
 
 export default function SituationDetail() {
@@ -158,27 +190,7 @@ export default function SituationDetail() {
                             </div>
                             <div className="space-y-4">
                                 {nonDraftEmails.map((email, i) => (
-                                    <Card key={email.id} className={`p-4 border-transparent shadow-sm border-l-4 ${i === 0 ? "border-l-[#0F1016]/20 bg-[#F2F2EC]" : "border-l-[#0F1016]/10 bg-[#F2F2EC]"}`}>
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-[#0000EE]/10 text-[#0000EE] w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs">
-                                                    {initials(email.from)}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-[#0F1016] text-sm">{email.from}</p>
-                                                    <p className="text-[#0F1016]/80 text-sm font-medium">{email.name}</p>
-                                                </div>
-                                            </div>
-                                            <span className="text-[10px] text-[#0F1016]/40 font-bold uppercase tracking-wider" suppressHydrationWarning>
-                                                {formatDistanceToNow(new Date(email.dateSent), { addSuffix: true })}
-                                            </span>
-                                        </div>
-                                        {email.body && (
-                                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-700 font-sans leading-relaxed line-clamp-4">
-                                                {email.body.replace(/<[^>]*>/g, '')}
-                                            </div>
-                                        )}
-                                    </Card>
+                                    <EmailCard key={email.id} email={email} isFirst={i === 0} />
                                 ))}
                                 {nonDraftEmails.length === 0 && (
                                     <p className="text-sm text-slate-400 italic">No communications yet</p>

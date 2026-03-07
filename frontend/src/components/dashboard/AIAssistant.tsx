@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MessageSquare, X, Send, Sparkles, ChevronRight, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:8001";
 
@@ -13,6 +14,13 @@ interface Message {
     timestamp: Date;
 }
 
+const WELCOME_MSG: Message = {
+    id: "1",
+    role: "assistant",
+    content: "Hi! I'm your Lette AI assistant. I have access to EspoCRM — ask me about emails, contacts, or cases.",
+    timestamp: new Date(),
+};
+
 const SUGGESTED_PROMPTS = [
     "Summarize high-priority maintenance",
     "Show me issues for Graylings",
@@ -20,16 +28,25 @@ const SUGGESTED_PROMPTS = [
     "Draft a response to the tenant"
 ];
 
+function loadMessages(): Message[] {
+    if (typeof window === "undefined") return [WELCOME_MSG];
+    try {
+        const raw = sessionStorage.getItem("lette-chat");
+        if (raw) {
+            const parsed = JSON.parse(raw) as Message[];
+            return parsed.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
+        }
+    } catch { /* ignore */ }
+    return [WELCOME_MSG];
+}
+
+function saveMessages(msgs: Message[]) {
+    try { sessionStorage.setItem("lette-chat", JSON.stringify(msgs)); } catch { /* ignore */ }
+}
+
 export function AIAssistant() {
     const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: "1",
-            role: "assistant",
-            content: "Hi! I'm your Lette AI assistant. I have access to EspoCRM — ask me about emails, contacts, or cases.",
-            timestamp: new Date()
-        }
-    ]);
+    const [messages, setMessages] = useState<Message[]>(loadMessages);
     const [inputValue, setInputValue] = useState("");
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -39,8 +56,103 @@ export function AIAssistant() {
     };
 
     useEffect(() => {
+        saveMessages(messages);
         if (isOpen) scrollToBottom();
     }, [messages, isOpen]);
+
+    const [statusText, setStatusText] = useState("");
+
+    const friendlyTool = (name: string) => {
+        if (name.includes("espocrm")) {
+            const action = name.split("__").pop() || name;
+            return `CRM: ${action.replace(/_/g, " ")}`;
+        }
+        return name.replace(/_/g, " ");
+    };
+
+    const processStream = async (url: string, body: string): Promise<string> => {
+        console.log("[chat] fetch processStream called, url:", url);
+        setStatusText("Connecting...");
+
+        const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+        });
+
+        console.log("[chat] fetch response status:", res.status);
+
+        if (res.status === 409) {
+            console.log("[chat] Agent busy (409), restarting session and retrying...");
+            setStatusText("Agent busy, restarting...");
+            await fetch(`${AGENT_URL}/session/restart`, { method: "POST" });
+            return processStream(url, body);
+        }
+
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        if (!res.body) throw new Error("No response body");
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let currentEvent = "";
+        let finalResponse = "";
+
+        console.log("[chat] starting stream read loop");
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                console.log("[chat] stream done");
+                break;
+            }
+
+            const chunk = decoder.decode(value, { stream: true });
+            console.log("[chat] chunk received, length:", chunk.length);
+            buffer += chunk;
+
+            // Process complete lines
+            const parts = buffer.split("\n");
+            buffer = parts.pop() || "";
+
+            for (const line of parts) {
+                if (line.startsWith("event: ")) {
+                    currentEvent = line.slice(7);
+                } else if (line.startsWith("data: ")) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        console.log("[chat] SSE event:", currentEvent, Object.keys(data));
+                        if (currentEvent === "status") {
+                            setStatusText(data.status === "connecting" ? "Connecting..." : "Thinking...");
+                        } else if (currentEvent === "tool_use") {
+                            setStatusText(friendlyTool(data.tool));
+                        } else if (currentEvent === "text") {
+                            finalResponse = data.text;
+                            setStatusText("Writing...");
+                        } else if (currentEvent === "done") {
+                            finalResponse = data.response;
+                        } else if (currentEvent === "error") {
+                            throw new Error(data.detail);
+                        }
+                    } catch (e) {
+                        if (e instanceof SyntaxError) continue;
+                        throw e;
+                    }
+                }
+            }
+        }
+
+        return finalResponse || "(no response)";
+    };
+
+    const handleNewChat = async () => {
+        setMessages([WELCOME_MSG]);
+        setLoading(false);
+        setStatusText("");
+        try {
+            await fetch(`${AGENT_URL}/session/restart`, { method: "POST" });
+        } catch { /* ignore */ }
+    };
 
     const handleSend = async (text: string) => {
         if (!text.trim() || loading) return;
@@ -55,33 +167,16 @@ export function AIAssistant() {
         setMessages(prev => [...prev, userMsg]);
         setInputValue("");
         setLoading(true);
+        setStatusText("Connecting...");
 
         try {
-            const res = await fetch(`${AGENT_URL}/prompt`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: text }),
-            });
+            const body = JSON.stringify({ message: text });
+            const response = await processStream(`${AGENT_URL}/prompt/stream`, body);
 
-            if (res.status === 409) {
-                setMessages(prev => [...prev, {
-                    id: (Date.now() + 1).toString(),
-                    role: "assistant",
-                    content: "I'm currently busy processing another request. Please try again in a moment.",
-                    timestamp: new Date()
-                }]);
-                return;
-            }
-
-            if (!res.ok) {
-                throw new Error(`${res.status} ${res.statusText}`);
-            }
-
-            const data = await res.json();
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content: data.response || "(no response)",
+                content: response,
                 timestamp: new Date()
             }]);
         } catch (err) {
@@ -93,6 +188,7 @@ export function AIAssistant() {
             }]);
         } finally {
             setLoading(false);
+            setStatusText("");
         }
     };
 
@@ -117,17 +213,26 @@ export function AIAssistant() {
                                     <div className="flex items-center gap-1.5">
                                         <div className={`w-1.5 h-1.5 rounded-full ${loading ? "bg-amber-400" : "bg-emerald-400"} animate-pulse`} />
                                         <span className="text-[11px] text-white/60 uppercase tracking-widest font-bold">
-                                            {loading ? "Thinking..." : "Online"}
+                                            {loading ? (statusText || "Thinking...") : "Online"}
                                         </span>
                                     </div>
                                 </div>
                             </div>
+                            <div className="flex items-center gap-1">
+                            <button
+                                onClick={handleNewChat}
+                                className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider hover:bg-white/10 rounded-full transition-colors text-white/60 hover:text-white"
+                                title="Start new chat"
+                            >
+                                New Chat
+                            </button>
                             <button
                                 onClick={() => setIsOpen(false)}
                                 className="p-2 hover:bg-white/10 rounded-full transition-colors"
                             >
                                 <X className="w-5 h-5" />
                             </button>
+                            </div>
                         </div>
 
                         {/* Messages Area */}
@@ -141,9 +246,11 @@ export function AIAssistant() {
                                         ? "bg-[#0000EE] text-white rounded-tr-none"
                                         : "bg-slate-50 border border-slate-100 text-[#0F1016] rounded-tl-none"
                                         }`}>
-                                        <p className={`text-[14px] leading-relaxed whitespace-pre-line ${msg.role === "assistant" ? "font-serif" : "font-sans font-medium"}`}>
-                                            {msg.content}
-                                        </p>
+                                        <div className={`text-[14px] leading-relaxed ${msg.role === "assistant" ? "font-serif" : "font-sans font-medium whitespace-pre-line"}`}>
+                                            {msg.role === "assistant"
+                                                ? <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                                : msg.content}
+                                        </div>
                                         <span className={`text-[10px] block mt-1 opacity-50 ${msg.role === "user" ? "text-right" : ""}`}>
                                             {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
@@ -152,8 +259,9 @@ export function AIAssistant() {
                             ))}
                             {loading && (
                                 <div className="flex justify-start">
-                                    <div className="bg-slate-50 border border-slate-100 rounded-[24px] rounded-tl-none p-4">
-                                        <Loader2 className="w-5 h-5 text-[#0000EE] animate-spin" />
+                                    <div className="bg-slate-50 border border-slate-100 rounded-[24px] rounded-tl-none p-4 flex items-center gap-2">
+                                        <Loader2 className="w-5 h-5 text-[#0000EE] animate-spin shrink-0" />
+                                        {statusText && <span className="text-xs text-[#0F1016]/50 font-sans">{statusText}</span>}
                                     </div>
                                 </div>
                             )}

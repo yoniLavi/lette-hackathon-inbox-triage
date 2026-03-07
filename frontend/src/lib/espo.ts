@@ -84,6 +84,7 @@ export async function getEmails(maxSize = 20): Promise<CrmEmail[]> {
         orderBy: "dateSent",
         order: "desc",
         maxSize: String(maxSize),
+        select: "id,name,status,dateSent,from,to,body,bodyPlain,isRead,parentId,parentType,personStringData",
     });
     return data.list || [];
 }
@@ -111,6 +112,7 @@ export async function getRelatedEmails(caseId: string): Promise<CrmEmail[]> {
         orderBy: "dateSent",
         order: "desc",
         maxSize: "50",
+        select: "id,name,status,dateSent,from,to,body,bodyPlain,isRead,parentId,parentType,personStringData",
     });
     return data.list || [];
 }
