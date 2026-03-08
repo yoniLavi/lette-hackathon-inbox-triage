@@ -35,3 +35,16 @@ improvements between shifts.
 
 - Group related incidents in single Notes rather than creating separate Notes for each thread
 - Cross-reference related emails by subject line and date to avoid duplicate analysis
+
+## Regulatory & Compliance
+
+- Dublin Fire Brigade (DFB) Fire Prevention Section conducts fire safety inspections with 28-day compliance deadlines for non-compliant items
+- Fire safety non-compliance requires remediation plan submission with timelines and contractor certifications
+- Contact type "legal" used for regulatory bodies like DFB (in addition to tenant/landlord/contractor/prospect/internal/external types)
+
+## Operations Procedures
+
+- Tenant move-out: 10 business day deposit return timeline after final inspection
+- Service lift booking required for tenant move-outs in multi-unit properties
+- Pre-departure walkthrough best practice (typically 1 week before move-out) to identify remediation needs
+- Email sender address may differ from signature name in email body (cross-reference contact records)

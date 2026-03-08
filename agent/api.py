@@ -34,7 +34,7 @@ SDK_OPTIONS = ClaudeCodeOptions(
 # ---------------------------------------------------------------------------
 # Session state
 # ---------------------------------------------------------------------------
-_RESPONSE_TIMEOUT = 90  # seconds — tear down session if SDK goes silent
+_RESPONSE_TIMEOUT = 300  # seconds — tear down session if SDK goes silent
 
 _client: ClaudeSDKClient | None = None
 _session_id: str | None = None

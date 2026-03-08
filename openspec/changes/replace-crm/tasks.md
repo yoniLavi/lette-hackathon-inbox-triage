@@ -42,7 +42,7 @@
 
 ## 8. Validation
 - [x] 8.1 Add CRM API integration tests (health, CRUD, filters, full-text search)
-- [ ] 8.2 Test: seed.py populates all 100 emails, contacts, properties
-- [ ] 8.3 Test: agent shift completes in < 60s for 1 email (vs 7+ min with EspoCRM)
-- [ ] 8.4 Test: frontend dashboard loads with data from new CRM API
-- [ ] 8.5 Test: `scripts/agent.py --shift` works end-to-end with new CRM
+- [x] 8.2 Test: seed.py populates all 100 emails, contacts, properties
+- [x] 8.3 Test: agent shift completes in ~40s per email (vs 7+ min with EspoCRM), ~10 tool calls per email (vs 109)
+- [x] 8.4 Test: frontend dashboard loads with data from new CRM API
+- [x] 8.5 Test: `scripts/agent.py --shift` works end-to-end with new CRM (3 emails, 32 tool calls, 120s)

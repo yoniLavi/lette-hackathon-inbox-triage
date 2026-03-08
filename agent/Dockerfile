@@ -32,6 +32,7 @@ COPY workspace/ /workspace/
 RUN mkdir -p /home/node/.claude && chown -R node:node /home/node /workspace
 
 USER node
+ENV PATH="/home/node/.local/bin:${PATH}"
 WORKDIR /workspace
 
 EXPOSE 8001
