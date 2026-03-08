@@ -18,7 +18,7 @@ interface Message {
 const WELCOME_MSG: Message = {
     id: "1",
     role: "assistant",
-    content: "Hi! I'm your Lette AI assistant. I have access to EspoCRM — ask me about emails, contacts, or cases.",
+    content: "Hi! I'm your Lette AI assistant. I have access to the CRM — ask me about emails, contacts, or cases.",
     timestamp: new Date(),
 };
 
@@ -77,7 +77,7 @@ export function AIAssistant() {
     const [statusText, setStatusText] = useState("");
 
     const friendlyTool = (name: string) => {
-        if (name.includes("espocrm")) {
+        if (name.includes("crm") || name.includes("Bash")) {
             const action = name.split("__").pop() || name;
             return `CRM: ${action.replace(/_/g, " ")}`;
         }

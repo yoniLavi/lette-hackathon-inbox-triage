@@ -3,25 +3,33 @@ Process all unprocessed emails in the CRM as a batch shift.
 ## Setup
 
 1. Create a Case for this shift:
-   - `create_entity(entityType="Case", name="Agent Shift — <today's date and time>", status="In Progress", priority="Normal")`
-   - Save the Case ID — you'll add Notes to it throughout the shift.
+   ```bash
+   crm cases create --json '{"name": "Agent Shift — <today's date and time>", "status": "in_progress", "priority": "normal"}'
+   ```
+   Save the Case ID — you'll add Notes to it throughout the shift.
 
 ## Find unprocessed emails
 
-2. Search for emails that haven't been replied to or processed:
-   - `search_entity(entityType="Email", where=[{"type": "equals", "attribute": "status", "value": "Archived"}], orderBy="dateSent", order="asc", limit=1)`
-   - This returns summarized results (IDs and subjects only). Do NOT retry with different params to get more fields.
+2. Search for emails that haven't been read:
+   ```bash
+   crm emails list --status archived --is-read false --order-by date_sent --order asc --limit 1
+   ```
 
 ## Process each email
 
 3. For each email, do the following steps. Work through them **one email at a time** — finish all steps for one email before moving to the next.
 
 ### a) Read the full email
-   - `get_entity(entityType="Email", entityId="<id>")` to get the body, dates, sender, and all fields.
+   ```bash
+   crm emails get <id>
+   ```
 
 ### b) Identify the sender
-   - Check the `from` address. Search for a matching Contact: `search_entity(entityType="Contact", where=[{"type": "contains", "attribute": "emailAddress", "value": "<email>"}], limit=1)`
-   - If found, note their linked Account (check `accountId` field on the Contact via `get_entity`).
+   - Check the `from_address`. Search for a matching Contact:
+     ```bash
+     crm contacts list --email <from_address>
+     ```
+   - If found, note their `property_id` and `type`.
    - If not found, note this as an unknown sender.
 
 ### c) Classify urgency
@@ -33,37 +41,38 @@ Process all unprocessed emails in the CRM as a batch shift.
 ### d) Take CRM actions
 
    **Draft a reply** (for emails that warrant a response):
-   - `create_entity(entityType="Email", subject="Re: <original subject>", body="<draft reply>", status="Draft", to="<sender email>", from="<property manager email>")`
+   ```bash
+   crm emails create --json '{"subject": "Re: <original subject>", "body": "<draft reply>", "status": "draft", "from_address": "<property manager email>", "to_addresses": ["<sender email>"]}'
+   ```
    - Use a professional, concise tone appropriate for Irish property management.
    - Reference specific details from the email. Don't be generic.
-   - For emergencies: acknowledge the issue, confirm immediate action, provide next steps.
-   - For routine matters: be helpful but brief.
-   - NEVER set status to "Sent" — always "Draft" for human review.
+   - NEVER set status to "sent" — always "draft" for human review.
 
    **Create a Task** (when follow-up action is needed):
-   - `create_entity(entityType="Task", name="<action description>", status="Not Started", priority="<Urgent|Normal|Low>", description="<context and steps>")`
-   - Link to the Contact if known: `link_entities(entityType="Task", entityId="<task_id>", linkName="contacts", linkedEntityId="<contact_id>")`
+   ```bash
+   crm tasks create --json '{"name": "<action description>", "status": "not_started", "priority": "<urgent|normal|low>", "description": "<context>", "case_id": <shift_case_id>, "contact_id": <contact_id>}'
+   ```
 
-   **Update Contact/Account** (if you learn new info):
-   - Only update if the email reveals concrete new information (e.g., new phone number, name correction).
+   **Mark email as read**:
+   ```bash
+   crm emails update <id> --json '{"is_read": true}'
+   ```
 
 ### e) Journal to the shift Case
-   - Add a Note to the Case: `create_entity(entityType="Note", post="<summary>", parentType="Case", parentId="<case_id>")`
-   - Summary format: `**<subject>** (from <sender>) — <urgency>. Actions: <what you did>.`
+   ```bash
+   crm notes create --json '{"content": "**<subject>** (from <sender>) — <urgency>. Actions: <what you did>.", "case_id": <shift_case_id>}'
+   ```
 
 ### f) Capture learnings
-   - If you discover something useful about CRM patterns, entity relationships, efficient search strategies, or domain knowledge that would help process future emails faster, **append it to `/workspace/learnings.md`**.
-   - Examples of things worth capturing:
-     - Entity relationship shortcuts (e.g., "Contacts have `accountId` — no need to search Accounts separately")
-     - Search patterns that work well or poorly
-     - Domain patterns (e.g., "RTB dispute emails always reference case numbers")
-     - MCP tool behaviors or quirks you notice
+   - If you discover something useful about CRM patterns, entity relationships, efficient search strategies, or domain knowledge, **append it to `/workspace/learnings.md`**.
    - Don't repeat insights already in the file — read it first.
 
 ## Wrap up
 
 4. Update the shift Case:
-   - `update_entity(entityType="Case", entityId="<case_id>", status="Closed", description="Processed <N> emails. <brief summary of key actions>.")`
+   ```bash
+   crm cases update <shift_case_id> --json '{"status": "closed", "description": "Processed <N> emails. <brief summary>."}'
+   ```
 
 5. Produce a final summary in this format:
 

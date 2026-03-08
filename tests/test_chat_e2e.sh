@@ -181,7 +181,7 @@ test_tool_use_events_appear() {
     restart_agent
 
     local sse
-    sse=$(stream_prompt "Use the EspoCRM tools to count how many Contact records exist. Return only the number." 120)
+    sse=$(stream_prompt "Use the crm CLI to count how many Contact records exist. Run: crm contacts list --limit 1. Return only the total number." 120)
 
     local tool_events
     tool_events=$(echo "$sse" | grep -c "^event: tool_use" || true)
@@ -241,7 +241,7 @@ test_409_when_busy() {
     restart_agent
 
     # Start a long request in the background
-    stream_prompt "Use EspoCRM tools to list all emails and summarize each one." 120 >/dev/null &
+    stream_prompt "Use the crm CLI to list all emails and summarize each one." 120 >/dev/null &
     local bg_pid=$!
     sleep 3
 

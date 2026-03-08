@@ -1,7 +1,7 @@
 export type UrgencyTier = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 
 export interface Activity {
-    id: string;
+    id: string | number;
     type: "email" | "system" | "agent";
     title: string;
     description: string;

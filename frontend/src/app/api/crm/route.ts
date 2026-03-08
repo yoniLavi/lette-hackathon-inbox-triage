@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const ESPOCRM_URL = process.env.ESPOCRM_URL || "http://localhost:8080";
-const ESPOCRM_API_KEY = process.env.ESPOCRM_API_KEY || "";
+const CRM_API_URL = process.env.CRM_API_URL || "http://localhost:8002";
 
 /**
- * Proxy GET requests to EspoCRM REST API.
- * Usage: /api/crm?path=Case&orderBy=modifiedAt&order=desc&maxSize=50
+ * Proxy GET requests to the CRM API.
+ * Usage: /api/crm?path=emails&order_by=date_sent&order=desc&limit=20
  */
 export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
@@ -14,7 +13,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Missing path parameter" }, { status: 400 });
     }
 
-    const url = new URL(`/api/v1/${path}`, ESPOCRM_URL);
+    const url = new URL(`/api/${path}`, CRM_API_URL);
     // Forward all params except "path"
     for (const [key, value] of searchParams.entries()) {
         if (key !== "path") {
@@ -23,16 +22,13 @@ export async function GET(req: NextRequest) {
     }
 
     const res = await fetch(url.toString(), {
-        headers: {
-            "X-Api-Key": ESPOCRM_API_KEY,
-            "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
     if (!res.ok) {
         return NextResponse.json(
-            { error: `EspoCRM ${res.status}: ${res.statusText}` },
+            { error: `CRM API ${res.status}: ${res.statusText}` },
             { status: res.status }
         );
     }

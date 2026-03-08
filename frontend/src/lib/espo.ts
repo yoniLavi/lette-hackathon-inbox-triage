@@ -1,9 +1,9 @@
 /**
- * EspoCRM data client.
+ * CRM data client.
  * Uses the Next.js /api/crm proxy route (works from both server and client).
  */
 
-async function espoFetch(path: string, params?: Record<string, string>) {
+async function crmFetch(path: string, params?: Record<string, string>) {
     const url = new URL("/api/crm", window.location.origin);
     url.searchParams.set("path", path);
     if (params) {
@@ -21,141 +21,127 @@ async function espoFetch(path: string, params?: Record<string, string>) {
 // --- Types matching CRM entities ---
 
 export interface CrmCase {
-    id: string;
+    id: number;
     name: string;
     status: string;
     priority: string;
     description: string;
-    accountId?: string;
-    accountName?: string;
-    createdAt: string;
-    modifiedAt: string;
+    property_id?: number;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface CrmEmail {
-    id: string;
-    name: string; // subject
+    id: number;
+    subject: string;
     status: string;
-    dateSent: string;
-    from: string;
-    to: string;
+    date_sent: string;
+    from_address: string;
+    to_addresses: string[];
+    cc_addresses: string[];
     body: string;
-    bodyPlain: string;
-    isRead: boolean;
-    parentId?: string;
-    parentType?: string;
+    body_plain: string;
+    is_read: boolean;
+    is_replied: boolean;
+    thread_id?: string;
+    thread_position?: number;
+    case_id?: number;
 }
 
 export interface CrmTask {
-    id: string;
+    id: number;
     name: string;
     status: string;
     priority: string;
     description: string;
-    dateStart?: string;
-    dateEnd?: string;
-    parentId?: string;
-    parentType?: string;
+    date_start?: string;
+    date_end?: string;
+    case_id?: number;
+    contact_id?: number;
 }
 
-export interface CrmAccount {
-    id: string;
+export interface CrmProperty {
+    id: number;
     name: string;
+    type: string;
+    units: number;
+    manager: string;
     description: string;
 }
 
 // --- Fetch functions ---
 
 export async function getCases(): Promise<CrmCase[]> {
-    const data = await espoFetch("Case", {
-        orderBy: "modifiedAt",
+    const data = await crmFetch("cases", {
+        order_by: "updated_at",
         order: "desc",
-        maxSize: "50",
+        limit: "50",
     });
     return data.list || [];
 }
 
-export async function getCase(id: string): Promise<CrmCase> {
-    return espoFetch(`Case/${id}`);
+export async function getCase(id: number): Promise<CrmCase> {
+    return crmFetch(`cases/${id}`);
 }
 
-export async function getEmails(maxSize = 20): Promise<CrmEmail[]> {
-    const data = await espoFetch("Email", {
-        orderBy: "dateSent",
+export async function getEmails(limit = 20): Promise<CrmEmail[]> {
+    const data = await crmFetch("emails", {
+        order_by: "date_sent",
         order: "desc",
-        maxSize: String(maxSize),
-        select: "id,name,status,dateSent,from,to,body,bodyPlain,isRead,parentId,parentType,personStringData",
+        limit: String(limit),
     });
     return data.list || [];
 }
 
-export async function getAccounts(): Promise<CrmAccount[]> {
-    const data = await espoFetch("Account", {
-        orderBy: "name",
+export async function getProperties(): Promise<CrmProperty[]> {
+    const data = await crmFetch("properties", {
+        order_by: "name",
         order: "asc",
-        maxSize: "50",
+        limit: "50",
     });
     return data.list || [];
 }
 
-export async function getTasks(maxSize = 50): Promise<CrmTask[]> {
-    const data = await espoFetch("Task", {
-        orderBy: "modifiedAt",
+export async function getTasks(limit = 50): Promise<CrmTask[]> {
+    const data = await crmFetch("tasks", {
+        order_by: "updated_at",
         order: "desc",
-        maxSize: String(maxSize),
+        limit: String(limit),
     });
     return data.list || [];
 }
 
-export async function getRelatedEmails(caseId: string): Promise<CrmEmail[]> {
-    const data = await espoFetch(`Case/${caseId}/emails`, {
-        orderBy: "dateSent",
+export async function getRelatedEmails(caseId: number): Promise<CrmEmail[]> {
+    const data = await crmFetch("emails", {
+        case_id: String(caseId),
+        order_by: "date_sent",
         order: "desc",
-        maxSize: "50",
-        select: "id,name,status,dateSent,from,to,body,bodyPlain,isRead,parentId,parentType,personStringData",
+        limit: "50",
     });
     return data.list || [];
 }
 
-export async function getRelatedTasks(caseId: string): Promise<CrmTask[]> {
-    const data = await espoFetch(`Case/${caseId}/tasks`, {
-        orderBy: "modifiedAt",
+export async function getRelatedTasks(caseId: number): Promise<CrmTask[]> {
+    const data = await crmFetch("tasks", {
+        case_id: String(caseId),
+        order_by: "updated_at",
         order: "desc",
-        maxSize: "50",
+        limit: "50",
     });
     return data.list || [];
 }
 
 export async function getEmailCount(): Promise<number> {
-    const data = await espoFetch("Email", {
-        maxSize: "0",
-        "where[0][type]": "isTrue",
-        "where[0][attribute]": "isRead",
-    });
-    // EspoCRM returns -1 for total without a where clause; use a trivial filter
-    const total = data.total;
-    if (total >= 0) return total;
-    // Fallback: fetch a batch and count
-    const all = await espoFetch("Email", { maxSize: "200", select: "id" });
-    return all.list?.length || 0;
+    const data = await crmFetch("counts");
+    return data.emails || 0;
 }
 
 export async function getOpenTaskCount(): Promise<number> {
-    const data = await espoFetch("Task", {
-        "where[0][type]": "notIn",
-        "where[0][attribute]": "status",
-        "where[0][value][]": "Completed",
-        maxSize: "0",
-    });
-    return data.total || 0;
+    const data = await crmFetch("counts");
+    return data.open_tasks || 0;
 }
 
 export async function getClosedCaseCount(): Promise<number> {
-    const data = await espoFetch("Case", {
-        "where[0][type]": "equals",
-        "where[0][attribute]": "status",
-        "where[0][value]": "Closed",
-        maxSize: "0",
-    });
-    return data.total || 0;
+    const data = await crmFetch("counts");
+    return data.closed_cases || 0;
 }

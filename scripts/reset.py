@@ -2,65 +2,37 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "requests",
-#     "python-dotenv",
+#     "httpx",
 # ]
 # ///
-"""Reset EspoCRM by deleting all Emails, Contacts, and Accounts."""
+"""Reset CRM by deleting all data via the API."""
 
 import os
-import subprocess
 
-from espo_api import EspoAPI
+import httpx
 
-ENTITIES = ["Task", "Case", "Email", "Contact", "Account"]
+CRM_API_URL = os.environ.get("CRM_API_URL", "http://localhost:8002")
+client = httpx.Client(base_url=CRM_API_URL, timeout=30)
 
-
-def delete_all(api, entity_type):
-    deleted = 0
-    while True:
-        result = api.get(entity_type, {"maxSize": 200, "select": "id"})
-        items = result.get("list", [])
-        if not items:
-            break
-        for item in items:
-            api.delete(f"{entity_type}/{item['id']}")
-            deleted += 1
-    print(f"  Deleted {deleted} {entity_type} records")
+# Order matters: delete children before parents (FK constraints)
+ENTITIES = ["notes", "tasks", "emails", "cases", "contacts", "properties"]
 
 
-def cleanup_db():
-    """Hard-delete soft-deleted records and orphaned pivot table rows."""
-    db_user = os.environ.get("MYSQL_USER", "espocrm")
-    db_pass = os.environ.get("MYSQL_PASSWORD", "espocrm_password")
-    db_name = os.environ.get("MYSQL_DATABASE", "espocrm")
-    sql = "; ".join([
-        "DELETE FROM email_user",
-        "DELETE FROM email_email_address",
-        "DELETE FROM email WHERE deleted = 1",
-        "DELETE FROM contact WHERE deleted = 1",
-        "DELETE FROM account WHERE deleted = 1",
-        "DELETE FROM `case` WHERE deleted = 1",
-        "DELETE FROM task WHERE deleted = 1",
-    ])
-    subprocess.run(
-        [
-            "docker", "compose", "exec", "-T", "mariadb",
-            "mariadb", f"-u{db_user}", f"-p{db_pass}", db_name,
-            "-e", sql,
-        ],
-        check=True,
-        capture_output=True,
-    )
-    print("  Cleaned up database")
+def delete_all(entity: str):
+    resp = client.delete(f"/api/{entity}")
+    if resp.status_code == 200:
+        data = resp.json()
+        print(f"  Deleted {data.get('count', '?')} {entity}")
+    elif resp.status_code == 404:
+        pass  # no data
+    else:
+        print(f"  Error deleting {entity}: {resp.status_code} {resp.text}")
 
 
 def main():
-    api = EspoAPI()
-    print("Resetting EspoCRM...")
+    print("Resetting CRM...")
     for entity in ENTITIES:
-        delete_all(api, entity)
-    cleanup_db()
+        delete_all(entity)
     print("Reset complete.")
 
 

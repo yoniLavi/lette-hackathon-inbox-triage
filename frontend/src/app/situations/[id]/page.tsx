@@ -14,10 +14,11 @@ import { useParams } from "next/navigation";
 
 function priorityToTier(priority: string): "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" {
     switch (priority) {
-        case "High": return "CRITICAL";
-        case "Normal": return "HIGH";
-        case "Low": return "MEDIUM";
-        default: return "LOW";
+        case "critical": return "CRITICAL";
+        case "high": return "HIGH";
+        case "medium": return "MEDIUM";
+        case "low": return "LOW";
+        default: return "MEDIUM";
     }
 }
 
@@ -40,7 +41,7 @@ function initials(email: string | null | undefined): string {
 
 function EmailCard({ email, isFirst }: { email: CrmEmail; isFirst: boolean }) {
     const [expanded, setExpanded] = useState(false);
-    const bodyText = (email.bodyPlain || email.body || "").replace(/<[^>]*>/g, '');
+    const bodyText = (email.body_plain || email.body || "").replace(/<[^>]*>/g, '');
     return (
         <Card
             className={`p-4 border-transparent shadow-sm border-l-4 cursor-pointer transition-all ${isFirst ? "border-l-[#0F1016]/20 bg-[#F2F2EC]" : "border-l-[#0F1016]/10 bg-[#F2F2EC]"} hover:shadow-md`}
@@ -49,15 +50,15 @@ function EmailCard({ email, isFirst }: { email: CrmEmail; isFirst: boolean }) {
             <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-3">
                     <div className="bg-[#0000EE]/10 text-[#0000EE] w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs">
-                        {initials(email.from)}
+                        {initials(email.from_address)}
                     </div>
                     <div>
-                        <p className="font-bold text-[#0F1016] text-sm">{email.from || "Unknown sender"}</p>
-                        <p className="text-[#0F1016]/80 text-sm font-medium">{email.name}</p>
+                        <p className="font-bold text-[#0F1016] text-sm">{email.from_address || "Unknown sender"}</p>
+                        <p className="text-[#0F1016]/80 text-sm font-medium">{email.subject}</p>
                     </div>
                 </div>
                 <span className="text-[10px] text-[#0F1016]/40 font-bold uppercase tracking-wider" suppressHydrationWarning>
-                    {formatDistanceToNow(new Date(email.dateSent), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(email.date_sent), { addSuffix: true })}
                 </span>
             </div>
             {bodyText && (
@@ -79,9 +80,9 @@ export default function SituationDetail() {
 
     useEffect(() => {
         Promise.all([
-            getCase(id).catch(() => null),
-            getRelatedEmails(id).catch(() => []),
-            getRelatedTasks(id).catch(() => []),
+            getCase(Number(id)).catch(() => null),
+            getRelatedEmails(Number(id)).catch(() => []),
+            getRelatedTasks(Number(id)).catch(() => []),
         ]).then(([c, e, t]) => {
             setCrmCase(c);
             setEmails(e);
@@ -107,8 +108,8 @@ export default function SituationDetail() {
     }
 
     const tier = priorityToTier(crmCase.priority);
-    const draftEmails = emails.filter(e => e.status === "Draft");
-    const nonDraftEmails = emails.filter(e => e.status !== "Draft");
+    const draftEmails = emails.filter(e => e.status === "draft");
+    const nonDraftEmails = emails.filter(e => e.status !== "draft");
 
     return (
         <div className="min-h-screen flex flex-col relative z-0 bg-[#F7F7F2]">
@@ -148,17 +149,17 @@ export default function SituationDetail() {
                                         <span className="text-[10px] font-sans font-bold text-[#0F1016]/60 bg-[#F2F2EC] px-2 py-0.5 rounded uppercase tracking-wider">{crmCase.status}</span>
                                     </div>
                                     <h1 className="text-2xl font-serif font-medium text-[#0F1016] tracking-tight leading-tight">{crmCase.name}</h1>
-                                    {crmCase.accountName && (
+                                    {crmCase.property_id && (
                                         <p className="text-[#0F1016]/60 flex items-center mt-1 text-sm font-medium">
                                             <MapPin className="w-3.5 h-3.5 mr-1.5 text-[#0F1016]/40" />
-                                            {crmCase.accountName}
+                                            Property #{crmCase.property_id}
                                         </p>
                                     )}
                                 </div>
                             </div>
                             <div className="flex gap-4 text-[10px] font-sans font-bold text-[#0F1016]/40 uppercase tracking-[0.2em] border-b border-[#0F1016]/5 pb-3 mt-4">
-                                <span className="flex items-center" suppressHydrationWarning><Clock className="w-3 h-3 mr-1" /> Opened: {formatDistanceToNow(new Date(crmCase.createdAt), { addSuffix: true })}</span>
-                                <span className="flex items-center" suppressHydrationWarning><Edit2 className="w-3 h-3 mr-1" /> Updated: {formatDistanceToNow(new Date(crmCase.modifiedAt), { addSuffix: true })}</span>
+                                <span className="flex items-center" suppressHydrationWarning><Clock className="w-3 h-3 mr-1" /> Opened: {formatDistanceToNow(new Date(crmCase.created_at), { addSuffix: true })}</span>
+                                <span className="flex items-center" suppressHydrationWarning><Edit2 className="w-3 h-3 mr-1" /> Updated: {formatDistanceToNow(new Date(crmCase.updated_at), { addSuffix: true })}</span>
                             </div>
                         </motion.div>
 
@@ -215,13 +216,13 @@ export default function SituationDetail() {
                                         {tasks.map((task, i) => (
                                             <div key={task.id} className={`p-4 hover:bg-white/30 transition-colors ${i < tasks.length - 1 ? "border-b border-[#0F1016]/5" : ""}`}>
                                                 <div className="flex items-start gap-3">
-                                                    <input type="checkbox" className="mt-1 rounded border-[#0F1016]/20 text-[#0000EE] focus:ring-[#0000EE] w-4 h-4 cursor-pointer" readOnly checked={task.status === "Completed"} />
+                                                    <input type="checkbox" className="mt-1 rounded border-[#0F1016]/20 text-[#0000EE] focus:ring-[#0000EE] w-4 h-4 cursor-pointer" readOnly checked={task.status === "completed"} />
                                                     <div className="flex-1">
                                                         <h4 className="font-bold text-[#0F1016] text-sm">{task.name}</h4>
                                                         {task.priority && (
                                                             <div className="flex text-[10px] font-bold uppercase tracking-wider text-[#0F1016]/60 gap-3 mt-1.5 font-sans">
                                                                 <span className="px-1.5 py-0.5 rounded bg-white border border-[#0F1016]/5">Priority: {task.priority}</span>
-                                                                {task.dateEnd && <span className="px-1.5 py-0.5 rounded bg-white border border-[#0F1016]/5">Due: {new Date(task.dateEnd).toLocaleDateString()}</span>}
+                                                                {task.date_end && <span className="px-1.5 py-0.5 rounded bg-white border border-[#0F1016]/5">Due: {new Date(task.date_end).toLocaleDateString()}</span>}
                                                             </div>
                                                         )}
                                                         {task.description && (
@@ -252,8 +253,8 @@ export default function SituationDetail() {
                                             </div>
                                         </div>
                                         <div className="p-4 border-b border-[#0F1016]/5 space-y-2 text-[13px]">
-                                            <div className="flex font-medium"><span className="w-16 text-[#0F1016]/40 font-bold uppercase text-[10px] pt-0.5">To:</span> <span className="text-[#0F1016]">{draft.to}</span></div>
-                                            <div className="flex font-medium"><span className="w-16 text-[#0F1016]/40 font-bold uppercase text-[10px] pt-0.5">Subject:</span> <span className="text-[#0F1016]">{draft.name}</span></div>
+                                            <div className="flex font-medium"><span className="w-16 text-[#0F1016]/40 font-bold uppercase text-[10px] pt-0.5">To:</span> <span className="text-[#0F1016]">{(draft.to_addresses || []).join(", ")}</span></div>
+                                            <div className="flex font-medium"><span className="w-16 text-[#0F1016]/40 font-bold uppercase text-[10px] pt-0.5">Subject:</span> <span className="text-[#0F1016]">{draft.subject}</span></div>
                                         </div>
                                         <div className="p-4 bg-white/50 font-sans text-sm text-[#0F1016]/80 leading-relaxed italic whitespace-pre-line">
                                             {draft.body?.replace(/<[^>]*>/g, '') || ""}
@@ -272,7 +273,7 @@ export default function SituationDetail() {
                         )}
 
                         {/* Context */}
-                        {crmCase.accountName && (
+                        {crmCase.property_id && (
                             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.35 }}>
                                 <Card className="shadow-sm border-transparent bg-[#F2F2EC]">
                                     <div className="border-b border-[#0F1016]/5 p-3 px-4 bg-[#0F1016]/5 rounded-t-xl">
@@ -282,7 +283,7 @@ export default function SituationDetail() {
                                     </div>
                                     <div className="p-4">
                                         <h4 className="text-[10px] font-bold text-[#0F1016]/40 uppercase tracking-[0.2em] mb-1">Property</h4>
-                                        <p className="font-bold text-[#0F1016] text-sm">{crmCase.accountName}</p>
+                                        <p className="font-bold text-[#0F1016] text-sm">Property #{crmCase.property_id}</p>
                                     </div>
                                 </Card>
                             </motion.div>

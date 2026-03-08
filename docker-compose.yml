@@ -1,40 +1,33 @@
 services:
-  mariadb:
-    image: mariadb:lts
+  postgres:
+    image: postgres:16-alpine
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      POSTGRES_DB: crm
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: crm
     volumes:
-      - mariadb-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
-  espocrm:
-    image: espocrm/espocrm
+  crm-api:
+    build: ./crm
+    command: uv run uvicorn main:app --host 0.0.0.0 --port 8002 --reload
     environment:
-      ESPOCRM_DATABASE_HOST: mariadb
-      ESPOCRM_DATABASE_NAME: ${MYSQL_DATABASE}
-      ESPOCRM_DATABASE_USER: ${MYSQL_USER}
-      ESPOCRM_DATABASE_PASSWORD: ${MYSQL_PASSWORD}
-      ESPOCRM_ADMIN_USERNAME: ${ESPOCRM_ADMIN_USERNAME}
-      ESPOCRM_ADMIN_PASSWORD: ${ESPOCRM_ADMIN_PASSWORD}
-      ESPOCRM_SITE_URL: ${ESPOCRM_SITE_URL}
+      DATABASE_URL: postgresql+asyncpg://crm:crm@postgres:5432/crm
     ports:
-      - "8080:80"
+      - "8002:8002"
     volumes:
-      - espocrm-data:/var/www/html
+      - ./crm/main.py:/app/main.py
+      - ./crm/models.py:/app/models.py
+      - ./crm/database.py:/app/database.py
     depends_on:
-      - mariadb
-    restart: unless-stopped
-
-  espocrm-daemon:
-    image: espocrm/espocrm
-    entrypoint: docker-daemon.sh
-    volumes:
-      - espocrm-data:/var/www/html
-    depends_on:
-      - espocrm
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   agent:
@@ -43,17 +36,16 @@ services:
       CLAUDE_CODE_USE_BEDROCK: ${CLAUDE_CODE_USE_BEDROCK}
       AWS_BEARER_TOKEN_BEDROCK: ${AWS_BEARER_TOKEN_BEDROCK}
       AWS_REGION: ${AWS_REGION}
-      ESPOCRM_API_KEY: ${ESPOCRM_API_KEY}
-      ESPOCRM_INTERNAL_URL: http://espocrm
+      CRM_API_URL: http://crm-api:8002
     volumes:
       - ./agent/api.py:/app/api.py
-      - ./agent/mcp.json:/app/mcp.json
       - ./agent/entrypoint.sh:/app/entrypoint.sh
       - ./agent/workspace:/workspace
+      - ./crm-cli:/opt/crm-cli
     ports:
       - "8001:8001"
     depends_on:
-      - espocrm
+      - crm-api
     restart: unless-stopped
 
   frontend:
@@ -62,19 +54,17 @@ services:
     command: sh -c "npm install && npm run dev"
     environment:
       NEXT_PUBLIC_AGENT_URL: http://localhost:8001
-      ESPOCRM_URL: http://espocrm
-      ESPOCRM_API_KEY: ${ESPOCRM_API_KEY}
+      CRM_API_URL: http://crm-api:8002
     volumes:
       - ./frontend:/app
       - frontend-node-modules:/app/node_modules
     ports:
       - "3000:3000"
     depends_on:
-      - espocrm
+      - crm-api
       - agent
     restart: unless-stopped
 
 volumes:
-  mariadb-data:
-  espocrm-data:
+  postgres-data:
   frontend-node-modules:

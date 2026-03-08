@@ -13,24 +13,24 @@ Hackathon project for Lette AI's PropTech challenge (2026-03-07). An agentic AI 
 
 ```
                         ┌─── agent container ───────────────────┐
-┌────────┐   HTTP API   │ ┌─────────────┐     ┌──────────┐     │     ┌──────────────┐
-│ Client │─────────────▶│ │ FastAPI      │────▶│ EspoMCP  │─────│────▶│   EspoCRM    │
-│        │◀─────────────│ │ (port 8001)  │◀────│ (stdio)  │◀────│────▶│ (system of   │
-└────────┘              │ └─────────────┘     └──────────┘     │     │   record)    │
-                        │       │                               │     └──────────────┘
-                        │       ▼                               │
+┌────────┐   HTTP API   │ ┌─────────────┐                       │
+│ Client │─────────────▶│ │ FastAPI      │     crm CLI           │     ┌──────────────┐
+│        │◀─────────────│ │ (port 8001)  │────(via Bash)─────────│────▶│   CRM API    │
+└────────┘              │ └─────────────┘                       │     │ (port 8002)  │
+                        │       │                               │     │ + PostgreSQL │
+                        │       ▼                               │     └──────────────┘
                         │  Claude Code SDK                      │
                         │  (persistent session via Bedrock)     │
                         └───────────────────────────────────────┘
 ```
 
-The agent runs as a persistent HTTP service. Each prompt is processed within a long-lived Claude Code SDK session that accumulates context. EspoCRM is the system of record — all state lives in the CRM.
+The agent runs as a persistent HTTP service. Each prompt is processed within a long-lived Claude Code SDK session that accumulates context. The CRM API (FastAPI + PostgreSQL) is the system of record — all state lives there.
 
 ## Tech Stack
 
 - **Docker Compose** — orchestrates the full stack
-- **EspoCRM** — open-source CRM with email integration and REST API
-- **EspoMCP** — MCP server bridging Claude to EspoCRM
+- **CRM API** — FastAPI + PostgreSQL with full-text search
+- **CRM CLI** — `crm` command-line tool for agent ↔ CRM interaction (no MCP overhead)
 - **Claude Code + Anthropic Agent SDK** — agentic AI layer
 - **Python** — seed scripts and utilities
 
@@ -42,16 +42,14 @@ Prerequisites: Docker, [uv](https://docs.astral.sh/uv/)
 # 1. Start the stack
 docker compose up -d
 
-# 2. Wait for EspoCRM to finish initializing (~30s on first run)
-#    Check with: docker compose logs -f espocrm
+# 2. Wait for CRM API to be ready (~10s)
+#    Check with: docker compose logs -f crm-api
 
-# 3. Seed test data (100 emails, 82 contacts, 5 accounts)
+# 3. Seed test data (100 emails, contacts, 5 properties)
 uv run scripts/seed.py
 
-# 4. Open EspoCRM at http://localhost:8080
-#    Login: admin / admin123
-#    Emails are under the "All" folder: Emails → All
-#    (direct link: http://localhost:8080/#Email/list/folder=all)
+# 4. Open the frontend at http://localhost:3000
+#    CRM API is at http://localhost:8002
 ```
 
 ### Talking to the agent
@@ -80,7 +78,7 @@ curl -X POST http://localhost:8001/prompt \
 ### Other commands
 
 ```bash
-# Reset CRM to blank state (deletes all Emails, Contacts, Accounts)
+# Reset CRM to blank state
 uv run scripts/reset.py
 
 # Reset + re-seed in one step
@@ -97,16 +95,20 @@ Built for **BTR/PRS property management** in Ireland (Build-to-Rent / Private Re
 ## Project Structure
 
 ```
+crm/                    # CRM API service (FastAPI + PostgreSQL)
+  main.py               # REST API with generic CRUD + full-text search
+  models.py             # SQLAlchemy models (6 entities)
+  database.py           # Async engine and session
+  Dockerfile            # Python + uv
+crm-cli/                # CRM CLI tool (installed in agent container)
+  crm_cli/main.py       # Click-based CLI: crm <entity> <action>
 agent/                  # Agent container (FastAPI + Claude Code SDK)
   api.py                # HTTP API server with session management
   pyproject.toml        # Python deps (managed by uv)
-  Dockerfile            # Node.js + Python + EspoMCP
-  entrypoint.sh         # Starts uvicorn (or one-shot CLI with args)
-  mcp.json              # EspoMCP config for CLI fallback
+  Dockerfile            # Node.js + Python + Claude Code
+  entrypoint.sh         # Installs crm-cli, starts uvicorn
 scripts/                # Python scripts (run with uv)
   agent.py              # CLI wrapper for the agent API
-  espo_api.py           # Shared EspoCRM API wrapper
-  espo_cli.py           # General EspoCRM REST CLI
   seed.py               # Seed CRM with challenge dataset
   reset.py              # Delete all seeded data
   reseed.py             # Reset + seed in one step

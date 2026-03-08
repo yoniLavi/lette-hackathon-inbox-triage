@@ -15,10 +15,11 @@ import { motion } from "framer-motion";
 // Map CRM priority to urgency tier
 function priorityToTier(priority: string): "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" {
     switch (priority) {
-        case "High": return "CRITICAL";
-        case "Normal": return "HIGH";
-        case "Low": return "MEDIUM";
-        default: return "LOW";
+        case "critical": return "CRITICAL";
+        case "high": return "HIGH";
+        case "medium": return "MEDIUM";
+        case "low": return "LOW";
+        default: return "MEDIUM";
     }
 }
 
@@ -144,10 +145,10 @@ export default function Dashboard() {
                                     <ActivityCard key={email.id} activity={{
                                         id: email.id,
                                         type: "email",
-                                        title: `${email.from || "Unknown"}`,
-                                        description: email.name,
-                                        timestamp: new Date(email.dateSent),
-                                    }} body={email.bodyPlain || email.body} />
+                                        title: `${email.from_address || "Unknown"}`,
+                                        description: email.subject,
+                                        timestamp: new Date(email.date_sent),
+                                    }} body={email.body_plain || email.body} />
                                 ))}
                                 {emails.length === 0 && <p className="text-sm text-slate-400 italic">No recent emails</p>}
                             </div>

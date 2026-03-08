@@ -2,11 +2,10 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "requests",
-#     "python-dotenv",
+#     "httpx",
 # ]
 # ///
-"""Reset and re-seed EspoCRM in one step."""
+"""Reset and re-seed CRM in one step."""
 
 from reset import main as reset_main
 from seed import main as seed_main

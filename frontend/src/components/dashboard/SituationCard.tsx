@@ -33,9 +33,7 @@ export function SituationCard({ crmCase, tier }: { crmCase: CrmCase; tier: Urgen
                                         {crmCase.name}
                                     </h3>
                                     <div className="flex items-center gap-2 text-[10px] font-sans font-bold text-[#0F1016]/40 uppercase tracking-[0.15em]">
-                                        {crmCase.accountName && <span>{crmCase.accountName}</span>}
-                                        {crmCase.accountName && <span className="w-0.5 h-0.5 rounded-full bg-[#0F1016]/20" />}
-                                        <span suppressHydrationWarning>{formatDistanceToNow(new Date(crmCase.modifiedAt), { addSuffix: true })}</span>
+                                        <span suppressHydrationWarning>{formatDistanceToNow(new Date(crmCase.updated_at), { addSuffix: true })}</span>
                                     </div>
                                 </div>
                             </div>

@@ -2,33 +2,50 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "requests",
-#     "python-dotenv",
+#     "httpx",
 # ]
 # ///
-"""Seed EspoCRM with challenge dataset: properties → Accounts, senders → Contacts, emails → Emails."""
+"""Seed CRM API with challenge dataset: properties, contacts, emails, cases, tasks."""
 
 import json
+import os
+import sys
 from pathlib import Path
 
-from espo_api import EspoAPI
+import httpx
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "challenge-definition" / "proptech-test-data.json"
+CRM_API_URL = os.environ.get("CRM_API_URL", "http://localhost:8002")
+
+client = httpx.Client(base_url=CRM_API_URL, timeout=30)
+
+
+def api_post(entity: str, data: dict) -> dict:
+    resp = client.post(f"/api/{entity}", json=data)
+    if resp.status_code != 201:
+        print(f"  ERROR creating {entity}: {resp.status_code} {resp.text}", file=sys.stderr)
+        resp.raise_for_status()
+    return resp.json()
 
 
 def load_data():
     return json.loads(DATA_PATH.read_text())
 
 
-def seed_accounts(api, properties):
-    """Create an Account per property. Returns {property_id: espo_account_id}."""
-    account_map = {}
+def seed_properties(properties):
+    """Create a Property per challenge property. Returns {challenge_id: crm_id}."""
+    prop_map = {}
     for prop in properties:
-        desc = f"Type: {prop['type']}\nUnits: {prop['units']}\nManager: {prop['manager']}"
-        account = api.post("Account", {"name": prop["name"], "description": desc})
-        account_map[prop["id"]] = account["id"]
-        print(f"  Account: {prop['name']} → {account['id']}")
-    return account_map
+        created = api_post("properties", {
+            "name": prop["name"],
+            "type": prop["type"],
+            "units": prop["units"],
+            "manager": prop["manager"],
+            "challenge_id": prop["id"],
+        })
+        prop_map[prop["id"]] = created["id"]
+        print(f"  Property: {prop['name']} → {created['id']}")
+    return prop_map
 
 
 def extract_senders(emails):
@@ -48,32 +65,31 @@ def split_name(full_name):
     return " ".join(parts[:-1]), parts[-1]
 
 
-def seed_contacts(api, senders, account_map):
-    """Create a Contact per unique sender. Returns {email_addr: espo_contact_id}."""
+def seed_contacts(senders, prop_map):
+    """Create a Contact per unique sender. Returns {email_addr: crm_id}."""
     contact_map = {}
     for sender in senders:
         first, last = split_name(sender["name"])
-        desc_parts = [f"Type: {sender['type']}"]
-        if "role" in sender:
-            desc_parts.append(f"Role: {sender['role']}")
-        if "company" in sender:
-            desc_parts.append(f"Company: {sender['company']}")
-        if "unit" in sender:
-            desc_parts.append(f"Unit: {sender['unit']}")
-
         payload = {
-            "firstName": first,
-            "lastName": last,
-            "emailAddress": sender["email"],
-            "description": "\n".join(desc_parts),
+            "first_name": first,
+            "last_name": last,
+            "email": sender["email"],
+            "type": sender["type"],
         }
-        prop_id = sender.get("property_id")
-        if prop_id and prop_id in account_map:
-            payload["accountId"] = account_map[prop_id]
+        if "role" in sender:
+            payload["role"] = sender["role"]
+        if "company" in sender:
+            payload["company"] = sender["company"]
+        if "unit" in sender:
+            payload["unit"] = sender["unit"]
 
-        contact = api.post("Contact", payload)
-        contact_map[sender["email"].lower()] = contact["id"]
-        print(f"  Contact: {sender['name']} <{sender['email']}> → {contact['id']}")
+        prop_id = sender.get("property_id")
+        if prop_id and prop_id in prop_map:
+            payload["property_id"] = prop_map[prop_id]
+
+        created = api_post("contacts", payload)
+        contact_map[sender["email"].lower()] = created["id"]
+        print(f"  Contact: {sender['name']} <{sender['email']}> → {created['id']}")
     return contact_map
 
 
@@ -83,17 +99,10 @@ def parse_addresses(field):
     return [a.strip() for a in field.split(",") if a.strip()]
 
 
-def get_user_id(api):
-    """Get the current (admin) user ID."""
-    return api.get("App/user")["user"]["id"]
-
-
-def seed_emails(api, emails, user_id):
-    """Create Emails with threading. Sorts by thread/position to seed parents first."""
+def seed_emails(emails):
+    """Create Emails with threading. Returns {challenge_id: crm_id}."""
     sorted_emails = sorted(emails, key=lambda e: (e["thread_id"], e["thread_position"]))
-
-    # thread_id → list of espo email ids (ordered by position)
-    thread_map = {}
+    email_map = {}
 
     for email in sorted_emails:
         to_addrs = parse_addresses(email["to"])
@@ -102,88 +111,70 @@ def seed_emails(api, emails, user_id):
         payload = {
             "subject": email["subject"],
             "body": email["body"],
-            "bodyPlain": email["body"],
-            "isHtml": False,
-            "dateSent": email["timestamp"],
-            "status": "Archived",
-            "isRead": email["read"],
-            "from": email["from"]["email"],
-            "to": ";".join(to_addrs),
-            "messageId": f"<{email['id']}@proptech-challenge>",
-            "cChallengeId": email["id"],
+            "body_plain": email["body"],
+            "from_address": email["from"]["email"],
+            "to_addresses": to_addrs,
+            "date_sent": email["timestamp"],
+            "status": "archived",
+            "is_read": email["read"],
+            "thread_id": email["thread_id"],
+            "thread_position": email["thread_position"],
+            "challenge_id": email["id"],
+            "message_id": f"<{email['id']}@proptech-challenge>",
         }
 
         if cc_addrs:
-            payload["cc"] = ";".join(cc_addrs)
+            payload["cc_addresses"] = cc_addrs
 
-        # Link reply to parent in same thread
-        if email["thread_position"] > 1 and email["thread_id"] in thread_map:
-            parent_idx = email["thread_position"] - 2
-            parent_ids = thread_map[email["thread_id"]]
-            if parent_idx < len(parent_ids):
-                # Find parent email's original id for inReplyTo
-                parent_original = next(
-                    (e for e in sorted_emails
-                     if e["thread_id"] == email["thread_id"]
-                     and e["thread_position"] == email["thread_position"] - 1),
-                    None,
-                )
-                payload["repliedId"] = parent_ids[parent_idx]
-                if parent_original:
-                    payload["inReplyTo"] = f"<{parent_original['id']}@proptech-challenge>"
+        # Link reply to parent via in_reply_to
+        if email["thread_position"] > 1:
+            parent = next(
+                (e for e in sorted_emails
+                 if e["thread_id"] == email["thread_id"]
+                 and e["thread_position"] == email["thread_position"] - 1),
+                None,
+            )
+            if parent:
+                payload["in_reply_to"] = f"<{parent['id']}@proptech-challenge>"
 
-        created = api.post("Email", payload)
-        api.link("Email", created["id"], "users", user_id)
-
-        thread_map.setdefault(email["thread_id"], []).append(created["id"])
+        created = api_post("emails", payload)
+        email_map[email["id"]] = created["id"]
         print(f"  Email: {email['id']} \"{email['subject'][:50]}\" → {created['id']}")
 
     print(f"Seeded {len(sorted_emails)} emails")
+    return email_map
 
 
-def find_emails_by_thread(api, thread_id, emails_data):
-    """Find EspoCRM email IDs for a given thread by matching messageId."""
-    ids = []
-    for email in sorted(emails_data, key=lambda e: e["thread_position"]):
-        if email["thread_id"] != thread_id:
-            continue
-        msg_id = f"<{email['id']}@proptech-challenge>"
-        result = api.get("Email", {
-            "where[0][type]": "equals",
-            "where[0][attribute]": "messageId",
-            "where[0][value]": msg_id,
-            "maxSize": "1",
-        })
-        if result.get("list"):
-            ids.append(result["list"][0]["id"])
-    return ids
-
-
-def seed_cases(api, emails_data, account_map):
+def seed_cases(emails_data, prop_map, email_map):
     """Create demo Cases linked to seeded emails."""
-    user_id = get_user_id(api)
     cases_data = [
         {
             "name": "Water Leak - Citynorth Quarter",
-            "priority": "High",
-            "status": "New",
-            "description": "Tenant Eoin Byrne reported a water leak through the bedroom ceiling. Water is actively flowing and damaging property. No contractor has been assigned yet. This is a habitability emergency requiring immediate response.",
-            "accountId": account_map.get("prop_001"),
+            "priority": "high",
+            "status": "new",
+            "description": "Tenant Eoin Byrne reported a water leak through the bedroom ceiling. "
+                           "Water is actively flowing and damaging property. This is a habitability "
+                           "emergency requiring immediate response.",
+            "property_id": prop_map.get("prop_001"),
             "thread_id": "thread_001",
             "tasks": [
-                {"name": "Assign emergency plumber", "priority": "Urgent", "description": "Habitability issue — RTB requires emergency response within 24h."},
-                {"name": "Contact tenant to confirm access", "priority": "Normal", "description": "Ensure someone is available to let the contractor in."},
+                {"name": "Assign emergency plumber", "priority": "urgent",
+                 "description": "Habitability issue — RTB requires emergency response within 24h."},
+                {"name": "Contact tenant to confirm access", "priority": "normal",
+                 "description": "Ensure someone is available to let the contractor in."},
             ],
         },
         {
             "name": "Heating Issue - Reds Works",
-            "priority": "Normal",
-            "status": "New",
-            "description": "Tenant Emer Crowley reports heating not working for 3 days. Follow-up needed to schedule contractor visit.",
-            "accountId": account_map.get("prop_002"),
+            "priority": "normal",
+            "status": "new",
+            "description": "Tenant Emer Crowley reports heating not working for 3 days. "
+                           "Follow-up needed to schedule contractor visit.",
+            "property_id": prop_map.get("prop_002"),
             "thread_id": "thread_003",
             "tasks": [
-                {"name": "Schedule heating contractor", "priority": "Normal", "description": "Coordinate with contractor for earliest available slot."},
+                {"name": "Schedule heating contractor", "priority": "normal",
+                 "description": "Coordinate with contractor for earliest available slot."},
             ],
         },
     ]
@@ -191,47 +182,45 @@ def seed_cases(api, emails_data, account_map):
     for case_data in cases_data:
         thread_id = case_data.pop("thread_id")
         tasks = case_data.pop("tasks")
-        case = api.post("Case", case_data)
-        print(f"  Case: {case_data['name']} → {case['id']}")
+        case = api_post("cases", case_data)
+        case_id = case["id"]
+        print(f"  Case: {case_data['name']} → {case_id}")
 
-        # Link emails from thread
-        email_ids = find_emails_by_thread(api, thread_id, emails_data)
-        for eid in email_ids:
-            try:
-                api.link("Case", case["id"], "emails", eid)
-            except Exception:
-                pass
+        # Link emails from thread to case
+        for challenge_id, crm_id in email_map.items():
+            email_entry = next(
+                (e for e in emails_data if e["id"] == challenge_id and e["thread_id"] == thread_id),
+                None,
+            )
+            if email_entry:
+                client.patch(f"/api/emails/{crm_id}", json={"case_id": case_id})
 
         # Create tasks
         for task_data in tasks:
-            task_data["parentType"] = "Case"
-            task_data["parentId"] = case["id"]
-            task_data["status"] = "Not Started"
-            task_data["assignedUserId"] = user_id
-            task = api.post("Task", task_data)
+            task_data["status"] = "not_started"
+            task_data["case_id"] = case_id
+            task = api_post("tasks", task_data)
             print(f"    Task: {task_data['name']} → {task['id']}")
 
 
 def main():
-    api = EspoAPI()
     data = load_data()
-    print("Seeding EspoCRM...\n")
+    print("Seeding CRM...\n")
 
-    print("Creating Accounts...")
-    account_map = seed_accounts(api, data["metadata"]["properties"])
-    print(f"\nCreated {len(account_map)} accounts\n")
+    print("Creating Properties...")
+    prop_map = seed_properties(data["metadata"]["properties"])
+    print(f"\nCreated {len(prop_map)} properties\n")
 
     print("Creating Contacts...")
     senders = extract_senders(data["emails"])
-    seed_contacts(api, senders, account_map)
-    print(f"\nCreated {len(senders)} contacts\n")
+    contact_map = seed_contacts(senders, prop_map)
+    print(f"\nCreated {len(contact_map)} contacts\n")
 
     print("Creating Emails...")
-    user_id = get_user_id(api)
-    seed_emails(api, data["emails"], user_id)
+    email_map = seed_emails(data["emails"])
 
     print("\nCreating Cases...")
-    seed_cases(api, data["emails"], account_map)
+    seed_cases(data["emails"], prop_map, email_map)
 
     print("\nSeed complete.")
 

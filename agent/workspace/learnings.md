@@ -4,19 +4,22 @@ Operational insights discovered during shift processing. Each entry is validated
 by experience, not speculation. We synthesize these into skills and CLAUDE.md
 improvements between shifts.
 
-## EspoMCP Patterns
+## CRM CLI Patterns
 
-- `search_entity` returns summarized results only (name, email, status) — no dates, no body, no IDs in the display. Always follow up with `get_entity` for full details.
-- `formatGenericEntityResults` (used for Email search) is especially limited. Dedicated formatters exist for Contact, Account, Meeting but NOT Email.
-- Use `orderBy` + `order` + `limit` on searches to get the records you actually need, rather than fetching everything and filtering.
-- **Email/Task creation via MCP tools has permission restrictions** — attempts to create Email or Task entities return "Access forbidden - insufficient permissions" or "Invalid request data" errors. Note creation works reliably. This limits shift automation to journaling only.
-- Direct API access via curl works for read operations. When MCP tools fail, fall back to API to verify entity structure and field names.
+- `crm` CLI outputs structured JSON on stdout — parse with jq when needed
+- List endpoints return `{"list": [...], "total": N}` — check `total` for pagination
+- Full-text search on emails: `crm emails list --search "water leak"`
+- Filter by FK: `crm emails list --case-id 3`, `crm tasks list --case-id 3`
+- Create with JSON: `crm cases create --json '{"name": "...", "status": "in_progress"}'`
+- Update specific fields: `crm emails update 42 --json '{"is_read": true}'`
 
 ## Entity Relationships
 
-- Contacts have `accountId` field linking directly to Accounts — no need to search separately
-- Emails can have `parentType` and `parentId` linking to Cases or other entities
-- Cases can contain Notes via `parentType="Case"` and `parentId` relationship
+- Contacts have `property_id` linking directly to Properties
+- Emails have `case_id` FK to Cases (set via update after case creation)
+- Tasks have `case_id` and `contact_id` direct FKs
+- Notes have `case_id` FK — used for shift journaling
+- Emails are threaded via `thread_id` and `thread_position`
 
 ## Domain Patterns
 
@@ -30,7 +33,5 @@ improvements between shifts.
 
 ## Efficiency Notes
 
-- When processing large batches of emails (50+), use batch GET operations via curl + jq to get quick summaries before detailed processing
-- Cross-reference related emails by subject line and date to avoid duplicate analysis
 - Group related incidents in single Notes rather than creating separate Notes for each thread
-- For shift journaling when Task creation is blocked, Notes work well as narrative logs with action items embedded
+- Cross-reference related emails by subject line and date to avoid duplicate analysis

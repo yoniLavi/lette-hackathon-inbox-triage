@@ -1,9 +1,8 @@
-"""Agent API — thin FastAPI wrapper around Claude Code SDK with EspoMCP."""
+"""Agent API — thin FastAPI wrapper around Claude Code SDK."""
 
 import asyncio
 import json
 import logging
-import os
 import uuid
 from contextlib import asynccontextmanager
 
@@ -19,10 +18,9 @@ from claude_code_sdk import ClaudeSDKClient
 from claude_code_sdk.types import (
     AssistantMessage,
     ClaudeCodeOptions,
-    McpStdioServerConfig,
     TextBlock,
-    ToolUseBlock,
     ToolResultBlock,
+    ToolUseBlock,
 )
 
 # ---------------------------------------------------------------------------
@@ -30,17 +28,6 @@ from claude_code_sdk.types import (
 # ---------------------------------------------------------------------------
 SDK_OPTIONS = ClaudeCodeOptions(
     cwd="/workspace",
-    mcp_servers={
-        "espocrm": McpStdioServerConfig(
-            command="node",
-            args=["/opt/espomcp/build/index.js"],
-            env={
-                "ESPOCRM_URL": os.environ.get("ESPOCRM_INTERNAL_URL", "http://espocrm"),
-                "ESPOCRM_API_KEY": os.environ.get("ESPOCRM_API_KEY", ""),
-                "ESPOCRM_AUTH_METHOD": "apikey",
-            },
-        ),
-    },
     permission_mode="bypassPermissions",
 )
 

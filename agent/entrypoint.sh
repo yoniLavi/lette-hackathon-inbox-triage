@@ -1,10 +1,14 @@
 #!/bin/sh
 set -e
 
+# Install CRM CLI if available (bind-mounted in dev compose)
+if [ -d /opt/crm-cli ]; then
+  uv pip install --system /opt/crm-cli 2>/dev/null || true
+fi
+
 # If arguments are passed, run one-shot CLI mode (backwards compat)
 if [ $# -gt 0 ]; then
   exec claude -p "$*" \
-    --mcp-config /app/mcp.json \
     --dangerously-skip-permissions
 fi
 

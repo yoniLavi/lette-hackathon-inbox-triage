@@ -72,7 +72,7 @@ def test_prompt_works_after_restart(api):
 def test_crm_query_returns_data(api):
     r = api.post(
         "/prompt",
-        json={"message": "Use the EspoCRM MCP tools to count how many Email records exist. Return ONLY the number."},
+        json={"message": "Use the crm CLI to count how many Email records exist. Run: crm emails list --limit 1. Return ONLY the total number."},
     )
     assert r.status_code == 200
     assert len(r.json()["response"]) > 0
