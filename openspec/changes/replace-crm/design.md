@@ -20,14 +20,15 @@ EspoCRM + EspoMCP is the performance bottleneck. Profiling shows 109 tool calls 
 ## Decisions
 
 ### FastAPI + PostgreSQL over Supabase
-- **Decision**: Build a minimal FastAPI service with SQLAlchemy + asyncpg
-- **Why**: Full control over the API shape, no external dependency, runs in Docker like everything else. Supabase would add PostgREST configuration complexity and a heavier Docker footprint for the same result.
-- **Alternative considered**: Supabase local — adds PostgREST + GoTrue + Studio containers. Overkill for 6 tables.
+- **Decision**: Build a minimal FastAPI service with SQLAlchemy + asyncpg, managed by uv
+- **Why**: Full control over the API shape, no external dependency, runs in Docker like everything else. Supabase would add PostgREST + GoTrue + Studio containers. Overkill for 6 tables.
+- **Alternative considered**: Supabase local — heavier Docker footprint for the same result.
 
 ### CLI over MCP
-- **Decision**: Python CLI (`crm-cli`) using click/typer, calling the CRM API via httpx
-- **Why**: The agent calls it via Bash — always available, no ToolSearch overhead, structured JSON output. Inspired by Google Workspace CLI (`gws`) pattern.
+- **Decision**: Python CLI (`crm-cli`) using click/typer, calling the CRM API via httpx, managed by uv
+- **Why**: The agent calls it via Bash — always available, no ToolSearch overhead, structured JSON output. Inspired by Google Workspace CLI (`gws`) pattern: `crm emails list`, `crm cases create --json '{...}'`.
 - **Alternative considered**: Custom MCP server wrapping the CRM API. Rejected because MCP tool discovery adds ~18 ToolSearch calls per shift, and MCP's stdio transport adds latency.
+- **Output**: JSON-only on stdout for now. Table format is nice-to-have for later.
 
 ### Single container for API + CLI
 - **Decision**: CRM API runs in its own container. CLI is a Python package installed in the agent container.
@@ -46,7 +47,7 @@ EspoCRM + EspoMCP is the performance bottleneck. Profiling shows 109 tool calls 
 - **Trade-off**: Losing EspoCRM's UI for manual data inspection
   - Acceptable: We have the frontend dashboard. For debugging, the CLI and `psql` are sufficient.
 
-## Open Questions
+## Resolved Questions
 
-- Should the CLI support `--format table` for human-readable output in addition to JSON? (Nice to have, not blocking.)
-- Do we need full-text search on email body, or is filtering by status/date/subject enough for now?
+- **CLI output format**: JSON-only for now. Table format is nice-to-have.
+- **Full-text search**: Yes, needed for agent productivity. Use PostgreSQL `tsvector` + GIN index on email subject + body. Simple `?search=<term>` query parameter on list endpoints. No RAG needed — Postgres FTS is sufficient for 100-1000 emails.

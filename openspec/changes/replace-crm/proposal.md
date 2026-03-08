@@ -61,6 +61,7 @@ Six entities, matching what we currently use:
 - `date_sent`, `status` (archived/draft/sent), `is_read`, `is_replied`, `is_important`
 - `message_id`, `in_reply_to`, `thread_id`, `challenge_id`
 - `case_id` (direct FK, replaces parentType/parentId pattern)
+- Full-text search via PostgreSQL `tsvector` + GIN index on subject + body (queryable via `?search=<term>` on list endpoint)
 
 ### Case
 - `id`, `name`, `status` (new/in_progress/closed), `priority` (critical/high/medium/low), `description`
@@ -76,6 +77,8 @@ Six entities, matching what we currently use:
 - `case_id` (direct FK)
 
 All entities have `created_at`, `updated_at` timestamps.
+
+All Python tooling uses uv (pyproject.toml, no pip/requirements.txt).
 
 Key simplifications from EspoCRM:
 - Direct foreign keys instead of `parentType`/`parentId` polymorphism
