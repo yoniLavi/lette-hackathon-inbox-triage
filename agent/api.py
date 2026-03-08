@@ -262,6 +262,54 @@ async def prompt_stream(req: PromptRequest):
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
+@app.post("/shift")
+async def shift():
+    """Start a batch shift — restart session, run /shift skill, return summary."""
+    global _busy
+
+    if _busy:
+        raise HTTPException(status_code=409, detail="Agent is busy with another request.")
+
+    _busy = True
+    try:
+        # Always start with a fresh session for a shift
+        await _teardown_client()
+        client = await _ensure_client()
+        await client.query("/shift")
+
+        text_parts: list[str] = []
+        loop = asyncio.get_event_loop()
+        cm = asyncio.timeout_at(loop.time() + _RESPONSE_TIMEOUT)
+        async with cm:
+            async for msg in client.receive_response():
+                cm.reschedule(loop.time() + _RESPONSE_TIMEOUT)
+                if isinstance(msg, AssistantMessage):
+                    for block in msg.content:
+                        if isinstance(block, ToolUseBlock):
+                            text_parts.clear()
+                        elif isinstance(block, TextBlock):
+                            text_parts.append(block.text)
+
+        global _message_count
+        _message_count += 1
+
+        return {
+            "response": "\n\n".join(text_parts) or "(no response)",
+            "session_id": _session_id or "",
+        }
+    except TimeoutError:
+        log.error("[shift] timeout — no SDK messages for %ds", _RESPONSE_TIMEOUT)
+        await _teardown_client()
+        raise HTTPException(status_code=504, detail=f"Shift timed out after {_RESPONSE_TIMEOUT}s of inactivity.")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await _teardown_client()
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        _busy = False
+
+
 @app.post("/session/restart")
 async def restart_session():
     global _busy

@@ -13,6 +13,7 @@ Usage:
 Commands:
     uv run scripts/agent.py --restart    Restart the agent session
     uv run scripts/agent.py --status     Show session status
+    uv run scripts/agent.py --shift      Start a batch email processing shift
 """
 
 import sys
@@ -27,6 +28,21 @@ def main():
         resp = httpx.post(f"{AGENT_URL}/session/restart")
         resp.raise_for_status()
         print("Session restarted.")
+        return
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--shift":
+        print("Starting shift (batch email processing)...")
+        try:
+            resp = httpx.post(f"{AGENT_URL}/shift", timeout=600.0)
+        except httpx.ConnectError:
+            print("Error: cannot connect to agent API at", AGENT_URL, file=sys.stderr)
+            print("Is the agent running? Try: docker compose up -d", file=sys.stderr)
+            sys.exit(1)
+        if resp.status_code == 409:
+            print("Error: agent is busy with another request", file=sys.stderr)
+            sys.exit(1)
+        resp.raise_for_status()
+        print(resp.json()["response"])
         return
 
     if len(sys.argv) > 1 and sys.argv[1] == "--status":
