@@ -45,6 +45,11 @@ The agent API SHALL expose an endpoint that triggers batch processing of active 
 - **WHEN** a user runs `scripts/agent.py --shift`
 - **THEN** the script calls `POST /shift` and prints the summary to stdout
 
+#### Scenario: Insight capture during shift
+- **WHEN** the agent discovers an operational pattern, gotcha, or effective technique while processing emails
+- **THEN** it appends the insight to `learnings.md` in its workspace
+- **AND** each entry includes what was learned and why it matters for future processing
+
 ## MODIFIED Requirements
 
 ### Requirement: Agent HTTP API
