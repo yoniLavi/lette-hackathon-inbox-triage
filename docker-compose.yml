@@ -45,6 +45,11 @@ services:
       AWS_REGION: ${AWS_REGION}
       ESPOCRM_API_KEY: ${ESPOCRM_API_KEY}
       ESPOCRM_INTERNAL_URL: http://espocrm
+    volumes:
+      - ./agent/api.py:/app/api.py
+      - ./agent/mcp.json:/app/mcp.json
+      - ./agent/entrypoint.sh:/app/entrypoint.sh
+      - ./agent/workspace:/workspace
     ports:
       - "8001:8001"
     depends_on:
