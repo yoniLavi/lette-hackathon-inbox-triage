@@ -15,7 +15,7 @@ ROLE_NAME = "Agent Full Access"
 
 # Scopes the agent needs access to
 SCOPES = [
-    "Email", "Contact", "Account", "Case", "Task",
+    "Email", "Contact", "Account", "Case", "Task", "Note",
     "Meeting", "Call", "Lead", "Opportunity", "Document",
 ]
 
@@ -37,13 +37,15 @@ def find_existing_role(api):
 
 def create_role(api):
     role = find_existing_role(api)
+    scope_data = {scope: {"create": "yes", "read": "all", "edit": "all", "delete": "all"} for scope in SCOPES}
+
     if role:
-        print(f"  Role '{ROLE_NAME}' already exists: {role['id']}")
+        # Always update permissions to match current SCOPES
+        api.put(f"Role/{role['id']}", {"data": scope_data})
+        print(f"  Role '{ROLE_NAME}' updated: {role['id']}")
         return role["id"]
 
     role = api.post("Role", {"name": ROLE_NAME})
-    # Scope permissions can only be set via update
-    scope_data = {scope: {"create": "yes", "read": "all", "edit": "all", "delete": "all"} for scope in SCOPES}
     api.put(f"Role/{role['id']}", {"data": scope_data})
     print(f"  Created role '{ROLE_NAME}': {role['id']}")
     return role["id"]

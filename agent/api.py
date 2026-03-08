@@ -124,6 +124,10 @@ async def prompt(req: PromptRequest) -> PromptResponse:
         raise HTTPException(status_code=409, detail="Agent is busy with another request.")
 
     _busy = True
+    import time as _time
+    t0 = _time.monotonic()
+    tool_count = 0
+    log.info("[prompt] query: %s", req.message[:120])
     try:
         client = await _ensure_client()
         prompt = req.message
@@ -136,11 +140,14 @@ async def prompt(req: PromptRequest) -> PromptResponse:
             if isinstance(msg, AssistantMessage):
                 for block in msg.content:
                     if isinstance(block, ToolUseBlock):
+                        tool_count += 1
+                        log.info("[prompt] tool #%d: %s (%.0fs)", tool_count, block.name, _time.monotonic() - t0)
                         text_parts.clear()
                     elif isinstance(block, TextBlock):
                         text_parts.append(block.text)
 
         _message_count += 1
+        log.info("[prompt] done — %d tool calls in %.0fs", tool_count, _time.monotonic() - t0)
 
         return PromptResponse(
             response="\n\n".join(text_parts) or "(no response)",
@@ -149,6 +156,7 @@ async def prompt(req: PromptRequest) -> PromptResponse:
     except HTTPException:
         raise
     except Exception as exc:
+        log.error("[prompt] error after %.0fs: %s", _time.monotonic() - t0, exc)
         await _teardown_client()
         raise HTTPException(status_code=500, detail=str(exc))
     finally:
@@ -271,10 +279,15 @@ async def shift():
         raise HTTPException(status_code=409, detail="Agent is busy with another request.")
 
     _busy = True
+    import time as _time
+    t0 = _time.monotonic()
+    tool_count = 0
+    log.info("[shift] starting — tearing down old session")
     try:
         # Always start with a fresh session for a shift
         await _teardown_client()
         client = await _ensure_client()
+        log.info("[shift] session ready (%s), sending /shift skill", _session_id)
         await client.query("/shift")
 
         text_parts: list[str] = []
@@ -286,24 +299,35 @@ async def shift():
                 if isinstance(msg, AssistantMessage):
                     for block in msg.content:
                         if isinstance(block, ToolUseBlock):
+                            tool_count += 1
+                            elapsed = _time.monotonic() - t0
+                            log.info("[shift] tool #%d: %s (%.0fs elapsed)", tool_count, block.name, elapsed)
                             text_parts.clear()
                         elif isinstance(block, TextBlock):
                             text_parts.append(block.text)
+                            # Log text snippets for progress visibility
+                            snippet = block.text[:120].replace("\n", " ")
+                            log.info("[shift] text: %s%s", snippet, "…" if len(block.text) > 120 else "")
 
         global _message_count
         _message_count += 1
+        elapsed = _time.monotonic() - t0
+        log.info("[shift] complete — %d tool calls in %.0fs", tool_count, elapsed)
 
         return {
             "response": "\n\n".join(text_parts) or "(no response)",
             "session_id": _session_id or "",
         }
     except TimeoutError:
-        log.error("[shift] timeout — no SDK messages for %ds", _RESPONSE_TIMEOUT)
+        elapsed = _time.monotonic() - t0
+        log.error("[shift] timeout after %.0fs (%d tool calls) — no SDK messages for %ds", elapsed, tool_count, _RESPONSE_TIMEOUT)
         await _teardown_client()
         raise HTTPException(status_code=504, detail=f"Shift timed out after {_RESPONSE_TIMEOUT}s of inactivity.")
     except HTTPException:
         raise
     except Exception as exc:
+        elapsed = _time.monotonic() - t0
+        log.error("[shift] error after %.0fs (%d tool calls): %s", elapsed, tool_count, exc)
         await _teardown_client()
         raise HTTPException(status_code=500, detail=str(exc))
     finally:

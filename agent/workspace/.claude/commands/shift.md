@@ -9,7 +9,7 @@ Process all unprocessed emails in the CRM as a batch shift.
 ## Find unprocessed emails
 
 2. Search for emails that haven't been replied to or processed:
-   - `search_entity(entityType="Email", where=[{"type": "equals", "attribute": "status", "value": "Archived"}], orderBy="dateSent", order="asc", limit=50)`
+   - `search_entity(entityType="Email", where=[{"type": "equals", "attribute": "status", "value": "Archived"}], orderBy="dateSent", order="asc", limit=1)`
    - This returns summarized results (IDs and subjects only). Do NOT retry with different params to get more fields.
 
 ## Process each email
