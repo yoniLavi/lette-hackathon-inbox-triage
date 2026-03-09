@@ -91,10 +91,10 @@ installed in the agent container.
   3. Before fetching a thread from a **different** case, assess context usage
   4. If >50% context consumed, close the shift and report summary
 
-  Context usage is not directly exposed by the SDK, but the agent can estimate based
-  on the volume of data it has processed (number of emails read, total text size).
-  The shift skill provides rough guidance: "If you've processed >30 emails or >60K
-  characters of email body, consider wrapping up."
+  The agent runs inside a Claude Code session and can check its own context usage
+  via the `/context` slash command, which returns a breakdown including free space
+  percentage. The shift skill instructs the agent to run `/context` before starting
+  a new case and wrap up if free space is below 50%.
 
 ## Risks / Trade-offs
 - **Eager loading size**: A large case could return ~30K tokens of context. This is
