@@ -143,9 +143,12 @@ async def list_entities(
         if val is not None:
             col = getattr(model, field, None)
             if col is not None:
-                # Handle boolean filters
-                if hasattr(col.type, "python_type") and col.type.python_type is bool:
-                    val = val.lower() in ("true", "1", "yes")
+                # Coerce query-param strings to column types
+                if hasattr(col.type, "python_type"):
+                    if col.type.python_type is bool:
+                        val = val.lower() in ("true", "1", "yes")
+                    elif col.type.python_type is int:
+                        val = int(val)
                 query = query.where(col == val)
                 count_query = count_query.where(col == val)
 
