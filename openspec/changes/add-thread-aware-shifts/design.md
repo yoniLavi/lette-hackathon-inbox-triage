@@ -70,6 +70,32 @@ installed in the agent container.
   Recomputed on email update.
 - **Why**: The agent should see a thread as "unprocessed" if any email in it is new.
 
+### Shift pacing: context-aware, not count-based
+- **Decision**: The agent does not use a fixed thread or email limit. Instead, it
+  always finishes the current case (all its unread threads), then checks context
+  usage before starting a new case. If context exceeds 50%, it wraps up the shift.
+- **Why**: The real constraint on shift length is the agent's context window, not an
+  arbitrary item count. A shift with 3 single-email threads is cheap; a shift with 1
+  thread of 50 emails is expensive. Count-based limits can't capture this.
+
+  This mirrors human behaviour: a property manager finishes the case in front of them
+  but won't start a new one near the end of their shift. The agent does the same —
+  it commits to completing the current case even if context is getting full, but
+  exercises judgement about whether to take on new work.
+
+  The automatic context compaction mechanism is the safety net if a single case is
+  genuinely enormous.
+- **Implementation**: The shift skill instructs the agent:
+  1. Fetch next unread thread via `crm shift next`
+  2. Process all threads belonging to the same case
+  3. Before fetching a thread from a **different** case, assess context usage
+  4. If >50% context consumed, close the shift and report summary
+
+  Context usage is not directly exposed by the SDK, but the agent can estimate based
+  on the volume of data it has processed (number of emails read, total text size).
+  The shift skill provides rough guidance: "If you've processed >30 emails or >60K
+  characters of email body, consider wrapping up."
+
 ## Risks / Trade-offs
 - **Eager loading size**: A large case could return ~30K tokens of context. This is
   within budget but worth monitoring. If cases grow beyond ~100 items, we'd add

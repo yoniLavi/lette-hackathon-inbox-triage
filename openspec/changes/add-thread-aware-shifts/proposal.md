@@ -39,7 +39,11 @@ total. Serialized as JSON this is ~30K tokens — well within the agent's 200K c
 
 ### 6. Shift skill update
 - Rewrite `shift.md` to process threads (not individual emails) using the new work-item endpoint
-- Add `--limit` parameter for shift pagination (default 10 threads per shift)
+- Context-aware shift pacing: the agent finishes the current case (all its unread
+  threads) but does not start a new case if context usage exceeds 50%. This mirrors
+  how a human property manager finishes the case in front of them but won't start a
+  new one near the end of their shift. No arbitrary email/thread count limit needed —
+  the agent manages its own pacing based on the actual constraint (context window).
 
 ### 7. Spec cleanup
 - Create `crm-api` spec (missing — was skipped during replace-crm archive)

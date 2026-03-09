@@ -37,10 +37,17 @@ The agent API SHALL expose an endpoint that triggers batch processing of active 
 - **WHEN** the agent finishes processing a thread
 - **THEN** it calls `crm shift complete` to batch-mark all emails in the thread as read
 
-#### Scenario: Shift pagination
-- **WHEN** the shift has processed the configured maximum number of threads (default 10)
+#### Scenario: Context-aware shift pacing
+- **WHEN** the agent finishes processing all unread threads for the current case
+- **AND** the agent estimates its context usage exceeds 50%
 - **THEN** the shift stops and reports the summary for threads processed so far
 - **AND** remaining unread threads are left for the next shift
+
+#### Scenario: Always finish the current case
+- **WHEN** the agent is processing threads belonging to a case
+- **AND** context usage exceeds 50% mid-case
+- **THEN** the agent continues processing remaining unread threads for that case before wrapping up
+- **AND** does not start a new case
 
 #### Scenario: Reject concurrent shifts
 - **WHEN** a shift is already in progress

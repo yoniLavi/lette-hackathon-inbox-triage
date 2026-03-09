@@ -23,7 +23,7 @@
 ## 5. Agent workspace — Shift skill rewrite
 - [ ] 5.1 Rewrite `shift.md` to process threads via `crm shift next`, not individual emails
 - [ ] 5.2 Update `CLAUDE.md` with Thread entity docs, include flag docs, shift endpoint docs
-- [ ] 5.3 Add `--limit` support to shift (default 10 threads per shift)
+- [ ] 5.3 Add context-aware pacing: finish current case, don't start new case if >50% context used
 
 ## 6. Seed scripts
 - [ ] 6.1 Update `scripts/seed.py` to populate `manager_email` on Properties
@@ -36,6 +36,7 @@
 ## 8. Validation
 - [ ] 8.1 Test: thread auto-creation from email inserts
 - [ ] 8.2 Test: `GET /api/shift/next` returns full context blob
-- [ ] 8.3 Test: shift processes 5 threads in <3 min with <5 tool calls per thread
-- [ ] 8.4 Test: multiple emails in same thread are processed together in one pass
+- [ ] 8.3 Test: shift processes 5 threads with <5 tool calls per thread
+- [ ] 8.4 Test: multiple emails in same thread/case are processed together in one pass
 - [ ] 8.5 Test: `POST /api/shift/complete` batch-marks emails read
+- [ ] 8.6 Test: agent wraps up shift when context is high, finishing current case first
