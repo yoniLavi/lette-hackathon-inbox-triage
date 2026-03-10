@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Two-Layer AI Architecture
-The agent SHALL run two persistent Claude Code SDK sessions: a Frontend AI (user-facing, smart model with MCP delegation tools) and a Worker AI (CRM agent with crm CLI access). The Frontend AI SHALL never block on CRM operations.
+The agent SHALL run two AI sessions: a Frontend AI (direct Anthropic/Bedrock API, user-facing, with delegation tools) and a Worker AI (Claude Code SDK session with crm CLI access). The Frontend AI SHALL never block on CRM operations.
 
 #### Scenario: Frontend AI responds instantly from page context
 - **WHEN** a user asks about data already in the page context (e.g., "what's the status of this case?")
@@ -19,21 +19,26 @@ The agent SHALL run two persistent Claude Code SDK sessions: a Frontend AI (user
 - **WHEN** a user asks a conversational question (e.g., "what can you help me with?")
 - **THEN** the Frontend AI responds directly within 3 seconds with no delegation
 
-### Requirement: Delegation MCP Server
-A lightweight MCP server SHALL run in the agent container, providing two tools to the Frontend AI for async worker delegation.
+### Requirement: Direct API Frontend AI
+The Frontend AI SHALL call the Anthropic/Bedrock Messages API directly via the `anthropic` Python SDK, bypassing the Claude Code CLI subprocess. It SHALL maintain conversation history in-process and define delegation tools as native tool definitions.
 
-#### Scenario: delegate_to_worker
-- **WHEN** the Frontend AI calls `delegate_to_worker(prompt)`
-- **THEN** the MCP server queues the prompt for the Worker AI
-- **AND** returns a task ID immediately (non-blocking)
+#### Scenario: No CLI subprocess overhead
+- **WHEN** a user sends a message that can be answered from page context
+- **THEN** the response is generated via a single Messages API call with no subprocess spawn
+- **AND** the total response time is under 3 seconds
 
-#### Scenario: get_worker_result
-- **WHEN** the Frontend AI calls `get_worker_result(task_id)`
-- **THEN** the MCP server returns the Worker AI's response text if complete
-- **OR** returns a "still working" status if the Worker is still processing
+#### Scenario: Conversation history preserved
+- **WHEN** a user sends a follow-up message in the same session
+- **THEN** the Frontend AI has access to all previous messages in the conversation
+- **AND** can reference earlier context without re-sending page data
+
+#### Scenario: Tool execution handled in-process
+- **WHEN** the Frontend AI returns a tool_use block for delegate_to_worker or get_worker_result
+- **THEN** the tool is executed in-process by the agent API (not by an external MCP server)
+- **AND** the tool result is sent back in a subsequent Messages API call
 
 ### Requirement: Worker AI Unchanged
-The Worker AI SHALL be the existing Claude Code SDK session with crm CLI access, CLAUDE.md domain knowledge, and shift skills. It receives plain-text prompts from the Frontend AI via the delegation MCP.
+The Worker AI SHALL be the existing Claude Code SDK session with crm CLI access, CLAUDE.md domain knowledge, and shift skills. It receives plain-text prompts from the Frontend AI via the delegation tools.
 
 #### Scenario: Worker receives delegated prompt
 - **WHEN** a prompt is delegated via `delegate_to_worker`
