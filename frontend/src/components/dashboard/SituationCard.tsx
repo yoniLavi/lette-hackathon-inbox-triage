@@ -1,9 +1,8 @@
 "use client"
 
 import { formatDistanceToNow } from "date-fns";
-import type { CrmCase } from "@/lib/crm";
+import type { CrmCase, UrgencyTier } from "@/lib/crm";
 import { caseActionStatus } from "@/lib/crm";
-import type { UrgencyTier } from "@/lib/data";
 import { Button } from "@/components/ui/Button";
 import { Sparkles, ChevronRight, MapPin, FileEdit, AlertCircle, CheckCircle2, ListChecks } from "lucide-react";
 import { motion } from "framer-motion";

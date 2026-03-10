@@ -18,6 +18,8 @@ async function crmFetch(path: string, params?: Record<string, string>) {
     return res.json();
 }
 
+export type UrgencyTier = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+
 // --- Types matching CRM entities ---
 
 export interface CrmProperty {
