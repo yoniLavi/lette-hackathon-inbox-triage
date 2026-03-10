@@ -36,6 +36,9 @@ Process unread email threads in the CRM as a batch shift.
 
 ### b) Take CRM actions
 
+   When the actions below are independent of each other (e.g. draft reply + create task
+   + journal note), run them in parallel to save time.
+
    **Draft a reply** (for emails that warrant a response):
    - Use the property's `manager_email` from the case context as the `from_address`.
    - Use a professional, concise tone appropriate for Irish property management.
@@ -49,6 +52,7 @@ Process unread email threads in the CRM as a batch shift.
    ```bash
    crm cases create --json '{"name": "<descriptive case name>", "status": "new", "priority": "<priority>", "description": "<context>", "property_id": <property_id>}'
    ```
+   Note: if you need to create a case first, do that before creating tasks/drafts that reference it.
 
    **Create Tasks** (when follow-up action is needed):
    ```bash

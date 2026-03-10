@@ -427,6 +427,22 @@ async def list_entities(
                 query = query.where(col == val)
                 count_query = count_query.where(col == val)
 
+    # Date range filters: ?date_end_before=2026-03-20&date_end_after=2026-03-10
+    for suffix, op in [("_before", "<="), ("_after", ">=")]:
+        for date_field in ["date_end", "date_start", "date_sent"]:
+            param_name = f"{date_field}{suffix}"
+            val = request.query_params.get(param_name)
+            if val is not None:
+                col = getattr(model, date_field, None)
+                if col is not None:
+                    try:
+                        dt_val = datetime.fromisoformat(val.replace("Z", "+00:00"))
+                    except ValueError:
+                        raise HTTPException(422, f"Invalid date for '{param_name}': {val}")
+                    clause = col <= dt_val if op == "<=" else col >= dt_val
+                    query = query.where(clause)
+                    count_query = count_query.where(clause)
+
     # Full-text search (emails only)
     if search and entity == "emails":
         fts_filter = text(

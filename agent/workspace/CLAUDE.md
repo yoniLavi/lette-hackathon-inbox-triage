@@ -15,10 +15,13 @@ crm emails list --search "water leak"   # full-text search on subject+body
 crm contacts list --type tenant --property-id 1
 crm cases list --status new --priority critical
 crm tasks list --case-id 3 --status not_started
+crm tasks list --status not_started --date-end-before 2026-03-20T00:00:00Z  # deadline queries
 crm notes list --case-id 3
 crm properties list
 crm threads list --is-read false --order-by last_activity_at --order asc
 ```
+
+Date range filters (ISO 8601): `--date-end-before`, `--date-end-after`, `--date-sent-before`, `--date-sent-after`
 
 Response format: `{"list": [...], "total": N}`
 

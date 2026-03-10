@@ -65,11 +65,12 @@ improvements between shifts.
 - Pest control response should include: (1) treat affected unit, (2) inspect suspected common area sources, (3) survey neighboring units
 - Musty smells near bin chutes/stores are indicators of potential pest breeding grounds
 
-## CRM Technical Issues (2026-03-09)
+## CRM Technical Notes
 
-- Server 500 errors observed when filtering tasks/notes by case_id (e.g., `crm tasks list --case-id 14`, `crm notes list --case-id 14`)
-- Server 500 errors observed when filtering contacts by property_id + type together
 - No --unit filter available for contacts list (must fetch all contacts for property and filter manually)
+- Use `--include` flag on `get` commands to load related data in one call (e.g., `crm cases get 3 --include emails,tasks,notes,property`)
+- `crm shift next` pre-loads thread + emails + contact + case + tasks + notes + property — use this during shifts instead of individual lookups
+- Date range filters available: `--date-end-before`, `--date-end-after`, `--date-sent-before`, `--date-sent-after` (ISO dates)
 
 ## BTR/PRS Emergency Patterns
 

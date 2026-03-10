@@ -82,6 +82,10 @@ def _add_entity_commands(entity_name: str):
     @click.option("--is-replied", "is_replied")
     @click.option("--challenge-id", "challenge_id")
     @click.option("--include", "include", help="Comma-separated related entities to include")
+    @click.option("--date-end-before", "date_end_before", help="Tasks/emails with date_end <= ISO date")
+    @click.option("--date-end-after", "date_end_after", help="Tasks/emails with date_end >= ISO date")
+    @click.option("--date-sent-before", "date_sent_before", help="Emails with date_sent <= ISO date")
+    @click.option("--date-sent-after", "date_sent_after", help="Emails with date_sent >= ISO date")
     def list_cmd(**kwargs):
         params = {k: v for k, v in kwargs.items() if v is not None}
         _output(_request("GET", entity_name, params=params))
