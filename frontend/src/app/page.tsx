@@ -1,16 +1,17 @@
 "use client"
 
 import React, { useEffect, useRef, useState } from "react";
-import { getCases, getEmails, getEmailCount, getOpenTaskCount, getClosedCaseCount } from "@/lib/espo";
-import type { CrmCase, CrmEmail } from "@/lib/espo";
+import { getCases, getCounts, getDraftCount } from "@/lib/crm";
+import type { CrmCase } from "@/lib/crm";
+import { caseActionStatus } from "@/lib/crm";
 import { SituationCard } from "@/components/dashboard/SituationCard";
-import { ActivityCard } from "@/components/dashboard/ActivityCard";
 import { QuickStats } from "@/components/dashboard/QuickStats";
 import { AIAssistant } from "@/components/dashboard/AIAssistant";
 import { Plus, User } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 // Map CRM priority to urgency tier
 function priorityToTier(priority: string): "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" {
@@ -27,20 +28,16 @@ export default function Dashboard() {
     const dashboardRef = useRef<HTMLDivElement>(null);
     const scrollTriggered = useRef(false);
     const [cases, setCases] = useState<CrmCase[]>([]);
-    const [emails, setEmails] = useState<CrmEmail[]>([]);
-    const [stats, setStats] = useState({ emails: 0, tasks: 0, closed: 0 });
+    const [stats, setStats] = useState({ tasks: 0, drafts: 0, closed: 0 });
 
     useEffect(() => {
         Promise.all([
-            getCases().catch(() => []),
-            getEmails(5).catch(() => []),
-            getEmailCount().catch(() => 0),
-            getOpenTaskCount().catch(() => 0),
-            getClosedCaseCount().catch(() => 0),
-        ]).then(([c, e, emailCount, taskCount, closedCount]) => {
+            getCases("emails,tasks,property").catch(() => []),
+            getCounts().catch(() => ({ emails: 0, open_tasks: 0, closed_cases: 0 })),
+            getDraftCount().catch(() => 0),
+        ]).then(([c, counts, draftCount]) => {
             setCases(c);
-            setEmails(e);
-            setStats({ emails: emailCount, tasks: taskCount, closed: closedCount });
+            setStats({ tasks: counts.open_tasks, drafts: draftCount, closed: counts.closed_cases });
         });
     }, []);
 
@@ -60,6 +57,15 @@ export default function Dashboard() {
     const criticalCases = cases.filter(c => priorityToTier(c.priority) === "CRITICAL");
     const highCases = cases.filter(c => priorityToTier(c.priority) === "HIGH");
 
+    // Work queue: non-closed cases that need attention, ordered by action priority
+    const actionOrder = { triage: 0, draft: 1, pending: 2, done: 3 };
+    const workQueue = cases
+        .filter(c => c.status !== "closed")
+        .filter(c => caseActionStatus(c).style !== "done")
+        .sort((a, b) => actionOrder[caseActionStatus(a).style] - actionOrder[caseActionStatus(b).style]);
+
+    const openCaseCount = cases.filter(c => c.status !== "closed").length;
+
     return (
         <div className="min-h-screen flex flex-col relative z-0 bg-[#F7F7F2]">
             <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
@@ -71,6 +77,11 @@ export default function Dashboard() {
                 <div className="max-w-7xl w-full flex items-center justify-between">
                     <Logo />
                     <div className="flex items-center gap-3">
+                        <Link href="/search">
+                            <Button className="h-9 px-5 rounded-full bg-[#F2F2EC] text-[#0F1016] hover:bg-[#0F1016]/10 text-[12px] font-sans font-bold transition-all hidden md:flex border border-[#0F1016]/10">
+                                Search
+                            </Button>
+                        </Link>
                         <Button className="h-9 px-5 rounded-full bg-[#0F1016] text-white hover:bg-black text-[12px] font-sans font-bold shadow-lg transition-all hidden md:flex">
                             <Plus size={16} className="mr-2" />
                             New Situation
@@ -93,7 +104,7 @@ export default function Dashboard() {
                     </h2>
                     <p className="font-sans text-[18px] text-[#0F1016]/60 max-w-xl leading-relaxed">
                         {cases.length > 0
-                            ? `${stats.emails} emails in the system. ${cases.length} open situations, ${stats.tasks} actions pending.`
+                            ? `${openCaseCount} open situation${openCaseCount !== 1 ? "s" : ""}, ${stats.tasks} action${stats.tasks !== 1 ? "s" : ""} pending${stats.drafts > 0 ? `, ${stats.drafts} draft${stats.drafts !== 1 ? "s" : ""} to review` : ""}.`
                             : "Loading your dashboard..."}
                     </p>
                     <motion.div
@@ -134,23 +145,24 @@ export default function Dashboard() {
                         </motion.section>
                     </div>
 
+                    {/* Center: Work queue — cases needing attention */}
                     <div className="lg:col-span-4">
                         <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
                             <h3 className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">
-                                Recent Emails
+                                Needs Your Attention
                                 <span className="ml-4 h-px flex-1 bg-slate-200"></span>
+                                <span className="ml-4 text-[#0000EE]">{workQueue.length}</span>
                             </h3>
                             <div className="space-y-3">
-                                {emails.map(email => (
-                                    <ActivityCard key={email.id} activity={{
-                                        id: email.id,
-                                        type: "email",
-                                        title: `${email.from_address || "Unknown"}`,
-                                        description: email.subject,
-                                        timestamp: new Date(email.date_sent),
-                                    }} body={email.body_plain || email.body} />
+                                {workQueue.map(c => (
+                                    <SituationCard key={c.id} crmCase={c} tier={priorityToTier(c.priority)} />
                                 ))}
-                                {emails.length === 0 && <p className="text-sm text-slate-400 italic">No recent emails</p>}
+                                {workQueue.length === 0 && cases.length > 0 && (
+                                    <div className="bg-[#F2F2EC] rounded-[20px] p-6 text-center">
+                                        <p className="text-sm text-[#0F1016]/60 font-sans">All caught up! No cases need your attention right now.</p>
+                                    </div>
+                                )}
+                                {cases.length === 0 && <p className="text-sm text-slate-400 italic">Loading...</p>}
                             </div>
                         </motion.section>
                     </div>
@@ -161,7 +173,7 @@ export default function Dashboard() {
                                 Quick Insights
                                 <span className="ml-4 h-px flex-1 bg-slate-200"></span>
                             </h3>
-                            <QuickStats emailCount={stats.emails} taskCount={stats.tasks} closedCount={stats.closed} />
+                            <QuickStats taskCount={stats.tasks} draftCount={stats.drafts} closedCount={stats.closed} />
                         </motion.div>
                     </div>
                 </div>

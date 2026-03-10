@@ -1,13 +1,20 @@
 "use client"
 
-import React from "react";
 import { formatDistanceToNow } from "date-fns";
-import type { CrmCase } from "@/lib/espo";
+import type { CrmCase } from "@/lib/crm";
+import { caseActionStatus } from "@/lib/crm";
 import type { UrgencyTier } from "@/lib/data";
 import { Button } from "@/components/ui/Button";
-import { Sparkles, ChevronRight } from "lucide-react";
+import { Sparkles, ChevronRight, MapPin, FileEdit, AlertCircle, CheckCircle2, ListChecks } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+
+const actionStyles = {
+    draft: { icon: FileEdit, color: "text-violet-600", bg: "bg-violet-50 border-violet-200" },
+    pending: { icon: ListChecks, color: "text-amber-600", bg: "bg-amber-50 border-amber-200" },
+    triage: { icon: AlertCircle, color: "text-rose-600", bg: "bg-rose-50 border-rose-200" },
+    done: { icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
+};
 
 export function SituationCard({ crmCase, tier }: { crmCase: CrmCase; tier: UrgencyTier }) {
     const urgencyStyles = {
@@ -16,6 +23,10 @@ export function SituationCard({ crmCase, tier }: { crmCase: CrmCase; tier: Urgen
         MEDIUM: { dot: "bg-[#0000EE]" },
         LOW: { dot: "bg-[#0F1016]/20" }
     };
+
+    const action = caseActionStatus(crmCase);
+    const ActionIcon = actionStyles[action.style].icon;
+    const propertyName = crmCase.property?.name;
 
     return (
         <motion.div layout className="group block">
@@ -33,9 +44,24 @@ export function SituationCard({ crmCase, tier }: { crmCase: CrmCase; tier: Urgen
                                         {crmCase.name}
                                     </h3>
                                     <div className="flex items-center gap-2 text-[10px] font-sans font-bold text-[#0F1016]/40 uppercase tracking-[0.15em]">
+                                        {propertyName && (
+                                            <>
+                                                <span className="flex items-center">
+                                                    <MapPin className="w-2.5 h-2.5 mr-0.5" />
+                                                    {propertyName}
+                                                </span>
+                                                <span className="text-[#0F1016]/20">·</span>
+                                            </>
+                                        )}
                                         <span suppressHydrationWarning>{formatDistanceToNow(new Date(crmCase.updated_at), { addSuffix: true })}</span>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Action status badge */}
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-sans font-bold uppercase tracking-wider ${actionStyles[action.style].bg} ${actionStyles[action.style].color}`}>
+                                <ActionIcon className="w-3 h-3" />
+                                {action.text}
                             </div>
 
                             {crmCase.description && (

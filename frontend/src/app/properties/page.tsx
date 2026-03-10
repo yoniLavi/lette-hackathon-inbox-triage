@@ -1,17 +1,37 @@
 "use client"
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Building2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { getProperties } from "@/lib/espo";
-import type { CrmProperty } from "@/lib/espo";
+import { getProperties, getCases, getContacts } from "@/lib/crm";
+import type { CrmProperty, CrmCase, CrmContact } from "@/lib/crm";
 
 export default function PropertiesView() {
     const [properties, setProperties] = useState<CrmProperty[]>([]);
+    const [caseCounts, setCaseCounts] = useState<Record<number, number>>({});
+    const [contactCounts, setContactCounts] = useState<Record<number, number>>({});
 
     useEffect(() => {
-        getProperties().catch(() => []).then(setProperties);
+        Promise.all([
+            getProperties().catch(() => []),
+            getCases().catch(() => []),
+            getContacts().catch(() => []),
+        ]).then(([props, cases, contacts]) => {
+            setProperties(props);
+
+            const cc: Record<number, number> = {};
+            for (const c of cases as CrmCase[]) {
+                if (c.property_id) cc[c.property_id] = (cc[c.property_id] || 0) + 1;
+            }
+            setCaseCounts(cc);
+
+            const ctc: Record<number, number> = {};
+            for (const c of contacts as CrmContact[]) {
+                if (c.property_id) ctc[c.property_id] = (ctc[c.property_id] || 0) + 1;
+            }
+            setContactCounts(ctc);
+        });
     }, []);
 
     return (
@@ -41,8 +61,16 @@ export default function PropertiesView() {
                                     <span>{prop.units} units</span>
                                     <span>{prop.manager}</span>
                                 </div>
+                                <div className="flex gap-3 mt-3 text-[10px] font-sans font-bold uppercase tracking-wider">
+                                    <span className="bg-[#0000EE]/10 text-[#0000EE] px-2 py-0.5 rounded-full">
+                                        {caseCounts[prop.id] || 0} cases
+                                    </span>
+                                    <span className="bg-[#0F1016]/10 text-[#0F1016]/60 px-2 py-0.5 rounded-full">
+                                        {contactCounts[prop.id] || 0} contacts
+                                    </span>
+                                </div>
                                 {prop.description && (
-                                    <p className="text-sm text-[#0F1016]/60 mt-2 font-sans whitespace-pre-line">{prop.description}</p>
+                                    <p className="text-sm text-[#0F1016]/60 mt-3 font-sans whitespace-pre-line">{prop.description}</p>
                                 )}
                             </div>
                         </Card>

@@ -1,6 +1,5 @@
 "use client"
 
-import React from "react";
 import Link from "next/link";
 import { Filter, ChevronDown } from "lucide-react";
 
@@ -15,12 +14,12 @@ const StatCard = ({ label, value, color }: { label: string, value: string, color
     </div>
 );
 
-export function QuickStats({ emailCount, taskCount, closedCount }: { emailCount: number; taskCount: number; closedCount: number }) {
+export function QuickStats({ taskCount, draftCount, closedCount }: { taskCount: number; draftCount: number; closedCount: number }) {
     return (
         <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-3">
-                <StatCard label="Emails" value={String(emailCount)} />
-                <StatCard label="Action Needed" value={String(taskCount).padStart(2, "0")} color="text-[#0000EE]" />
+                <StatCard label="Pending Tasks" value={String(taskCount).padStart(2, "0")} color="text-[#0000EE]" />
+                <StatCard label="Drafts to Review" value={String(draftCount).padStart(2, "0")} color="text-violet-600" />
                 <StatCard label="Resolved" value={String(closedCount).padStart(2, "0")} />
             </div>
 
