@@ -26,10 +26,11 @@ The frontend SHALL include a floating chat widget that sends messages to the age
 - **THEN** the widget displays the tool name in the status indicator as each `tool_use` SSE event arrives
 - **AND** updates are visible within seconds of the tool being invoked
 
-#### Scenario: Agent is busy
-- **WHEN** a user sends a message while the agent is already processing another request
-- **THEN** the agent API returns 409
-- **AND** the widget automatically restarts the session and retries the message
+#### Scenario: Two-phase response
+- **WHEN** the Frontend AI delegates CRM work to the Worker
+- **THEN** the widget first shows the Frontend AI's immediate acknowledgment
+- **AND** then updates with the Worker's CRM results when they arrive
+- **AND** the user sees continuous progress throughout (never a blank loading state after the acknowledgment)
 
 #### Scenario: Network error
 - **WHEN** the agent API is unreachable or returns a server error

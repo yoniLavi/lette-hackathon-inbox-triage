@@ -1,10 +1,10 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react";
-import { usePathname } from "next/navigation";
 import { MessageSquare, X, Send, Sparkles, ChevronRight, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import { usePageData, serializePageContext } from "@/lib/page-context";
 
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:8001";
 
@@ -25,7 +25,7 @@ const WELCOME_MSG: Message = {
 const SUGGESTED_PROMPTS = [
     "Summarize high-priority maintenance",
     "Show me issues for Graylings",
-    "What's the status of the leak case?",
+    "What's the status of this case?",
     "Draft a response to the tenant"
 ];
 
@@ -45,24 +45,13 @@ function saveMessages(msgs: Message[]) {
     try { sessionStorage.setItem("lette-chat", JSON.stringify(msgs)); } catch { /* ignore */ }
 }
 
-function usePageContext(): string {
-    const pathname = usePathname();
-    if (pathname === "/") return "User is on the main dashboard, which shows a work queue of cases needing attention (with action status badges like 'Draft ready', 'Needs triage', 'N actions pending'), priority queues (Critical/High cases), and work-centric stats (Pending Tasks, Drafts to Review, Resolved).";
-    if (pathname.startsWith("/situations/")) {
-        const id = pathname.split("/").pop();
-        return `User is viewing case/situation detail page (case ID: ${id}). They can see the AI summary, recommended actions (tasks), draft responses for review, communications grouped by thread with contact names and type badges, related contacts grouped by type, agent notes, and property context.`;
-    }
-    if (pathname === "/properties") return "User is on the Properties page, which lists properties with case and contact counts.";
-    if (pathname === "/search") return "User is on the Search page, which searches emails via full-text search with contact resolution.";
-    return `User is on page: ${pathname}`;
-}
-
 export function AIAssistant() {
-    const pageContext = usePageContext();
+    const { data: pageData } = usePageData();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>(loadMessages);
     const [inputValue, setInputValue] = useState("");
     const [loading, setLoading] = useState(false);
+    const [streamingText, setStreamingText] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -73,6 +62,10 @@ export function AIAssistant() {
         saveMessages(messages);
         if (isOpen) scrollToBottom();
     }, [messages, isOpen]);
+
+    useEffect(() => {
+        if (isOpen && (loading || streamingText)) scrollToBottom();
+    }, [streamingText, loading, isOpen]);
 
     const [statusText, setStatusText] = useState("");
 
@@ -87,6 +80,7 @@ export function AIAssistant() {
     const processStream = async (url: string, body: string): Promise<string> => {
         console.log("[chat] fetch processStream called, url:", url);
         setStatusText("Connecting...");
+        setStreamingText("");
 
         const res = await fetch(url, {
             method: "POST",
@@ -111,6 +105,7 @@ export function AIAssistant() {
         let buffer = "";
         let currentEvent = "";
         let finalResponse = "";
+        let liveText = "";
 
         console.log("[chat] starting stream read loop");
 
@@ -122,7 +117,6 @@ export function AIAssistant() {
             }
 
             const chunk = decoder.decode(value, { stream: true });
-            console.log("[chat] chunk received, length:", chunk.length);
             buffer += chunk;
 
             // Process complete lines
@@ -137,14 +131,22 @@ export function AIAssistant() {
                         const data = JSON.parse(line.slice(6));
                         console.log("[chat] SSE event:", currentEvent, Object.keys(data));
                         if (currentEvent === "status") {
-                            setStatusText(data.status === "connecting" ? "Connecting..." : "Thinking...");
+                            const label = data.status === "connecting" ? "Connecting..."
+                                : data.status === "querying_crm" ? "Searching CRM..."
+                                : "Thinking...";
+                            setStatusText(label);
                         } else if (currentEvent === "tool_use") {
                             setStatusText(friendlyTool(data.tool));
+                            // Keep fast AI text visible while tools run — don't clear
                         } else if (currentEvent === "progress") {
                             setStatusText(data.text || "Working...");
                         } else if (currentEvent === "text") {
-                            finalResponse = data.text;
-                            setStatusText("Writing...");
+                            // Each text event replaces the displayed text.
+                            // Fast AI sends the first text (acknowledgment or full answer).
+                            // Worker sends later text (CRM results) which replaces it.
+                            liveText = data.text;
+                            setStreamingText(liveText);
+                            setStatusText("");
                         } else if (currentEvent === "done") {
                             finalResponse = data.response;
                         } else if (currentEvent === "error") {
@@ -158,13 +160,14 @@ export function AIAssistant() {
             }
         }
 
-        return finalResponse || "(no response)";
+        return finalResponse || liveText || "(no response)";
     };
 
     const handleNewChat = async () => {
         setMessages([WELCOME_MSG]);
         setLoading(false);
         setStatusText("");
+        setStreamingText("");
         try {
             await fetch(`${AGENT_URL}/session/restart`, { method: "POST" });
         } catch { /* ignore */ }
@@ -184,9 +187,11 @@ export function AIAssistant() {
         setInputValue("");
         setLoading(true);
         setStatusText("Connecting...");
+        setStreamingText("");
 
         try {
-            const body = JSON.stringify({ message: text, context: pageContext });
+            const context = serializePageContext(pageData);
+            const body = JSON.stringify({ message: text, context: context || undefined });
             const response = await processStream(`${AGENT_URL}/prompt/stream`, body);
 
             setMessages(prev => [...prev, {
@@ -205,6 +210,7 @@ export function AIAssistant() {
         } finally {
             setLoading(false);
             setStatusText("");
+            setStreamingText("");
         }
     };
 
@@ -273,7 +279,24 @@ export function AIAssistant() {
                                     </div>
                                 </div>
                             ))}
-                            {loading && (
+                            {/* Live streaming response — shows text as it arrives */}
+                            {loading && streamingText && (
+                                <div className="flex justify-start">
+                                    <div className="max-w-[85%] rounded-[24px] p-4 bg-slate-50 border border-slate-100 text-[#0F1016] rounded-tl-none">
+                                        <div className="text-[14px] leading-relaxed font-serif">
+                                            <ReactMarkdown>{streamingText}</ReactMarkdown>
+                                        </div>
+                                        {statusText && (
+                                            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
+                                                <Loader2 className="w-3 h-3 text-[#0000EE] animate-spin" />
+                                                <span className="text-[10px] text-[#0F1016]/40 font-sans">{statusText}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {/* Loading indicator when no text has arrived yet */}
+                            {loading && !streamingText && (
                                 <div className="flex justify-start">
                                     <div className="bg-slate-50 border border-slate-100 rounded-[24px] rounded-tl-none p-4 flex items-center gap-2">
                                         <Loader2 className="w-5 h-5 text-[#0000EE] animate-spin shrink-0" />

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { Lora, JetBrains_Mono } from "next/font/google";
+import { PageDataProvider } from "@/lib/page-context";
 import "./globals.css";
 
 const tiemposFallback = Lora({
@@ -28,9 +29,11 @@ export default function RootLayout({
       <body className="relative w-full h-full overflow-x-hidden antialiased selection:bg-primary/20 selection:text-primary min-h-screen text-[14px]">
         {/* Soft Futurism Orbs mapped to new accent/primary colors */}
         <div className="fixed inset-0 -z-10 bg-[#EDEDE9]" />
+        <PageDataProvider>
         <div className="relative z-10 w-full h-full">
           {children}
         </div>
+        </PageDataProvider>
       </body>
     </html>
   );

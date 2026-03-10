@@ -5,6 +5,7 @@ import { ArrowLeft, Clock, Zap, MapPin, FileText, Send, MoreVertical, Users, Sti
 import Link from "next/link";
 import { getCase, getRelatedEmails, getRelatedTasks, getNotes, contactName, senderDisplay } from "@/lib/crm";
 import type { CrmCase, CrmEmail, CrmTask, CrmNote, CrmContact } from "@/lib/crm";
+import { usePageData, buildSituationContext } from "@/lib/page-context";
 import { UrgencyBadge } from "@/components/ui/Badge";
 import { ContactBadge } from "@/components/ui/ContactBadge";
 import { Card } from "@/components/ui/Card";
@@ -154,6 +155,7 @@ export default function SituationDetail() {
     const [tasks, setTasks] = useState<CrmTask[]>([]);
     const [notes, setNotes] = useState<CrmNote[]>([]);
     const [loading, setLoading] = useState(true);
+    const { setData } = usePageData();
 
     useEffect(() => {
         Promise.all([
@@ -167,6 +169,13 @@ export default function SituationDetail() {
             setTasks(t);
             setNotes(n);
             setLoading(false);
+            if (c) {
+                const contacts = extractContacts(e);
+                const draftCount = e.filter((em: CrmEmail) => em.status === "draft").length;
+                const ctx = buildSituationContext(c, t, n, contacts);
+                ctx.draftCount = draftCount;
+                setData(ctx);
+            }
         });
     }, [id]);
 

@@ -6,11 +6,13 @@ import { ArrowLeft, Building2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { getProperties, getCases, getContacts } from "@/lib/crm";
 import type { CrmProperty, CrmCase, CrmContact } from "@/lib/crm";
+import { usePageData, buildPropertiesContext } from "@/lib/page-context";
 
 export default function PropertiesView() {
     const [properties, setProperties] = useState<CrmProperty[]>([]);
     const [caseCounts, setCaseCounts] = useState<Record<number, number>>({});
     const [contactCounts, setContactCounts] = useState<Record<number, number>>({});
+    const { setData } = usePageData();
 
     useEffect(() => {
         Promise.all([
@@ -31,6 +33,8 @@ export default function PropertiesView() {
                 if (c.property_id) ctc[c.property_id] = (ctc[c.property_id] || 0) + 1;
             }
             setContactCounts(ctc);
+
+            setData(buildPropertiesContext(props, cc, ctc));
         });
     }, []);
 

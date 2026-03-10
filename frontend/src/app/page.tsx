@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { getCases, getCounts, getDraftCount } from "@/lib/crm";
 import type { CrmCase } from "@/lib/crm";
 import { caseActionStatus } from "@/lib/crm";
+import { usePageData, buildDashboardContext } from "@/lib/page-context";
 import { SituationCard } from "@/components/dashboard/SituationCard";
 import { QuickStats } from "@/components/dashboard/QuickStats";
 import { AIAssistant } from "@/components/dashboard/AIAssistant";
@@ -29,6 +30,7 @@ export default function Dashboard() {
     const scrollTriggered = useRef(false);
     const [cases, setCases] = useState<CrmCase[]>([]);
     const [stats, setStats] = useState({ tasks: 0, drafts: 0, closed: 0 });
+    const { setData } = usePageData();
 
     useEffect(() => {
         Promise.all([
@@ -37,7 +39,9 @@ export default function Dashboard() {
             getDraftCount().catch(() => 0),
         ]).then(([c, counts, draftCount]) => {
             setCases(c);
-            setStats({ tasks: counts.open_tasks, drafts: draftCount, closed: counts.closed_cases });
+            const s = { tasks: counts.open_tasks, drafts: draftCount, closed: counts.closed_cases };
+            setStats(s);
+            setData(buildDashboardContext(c, s));
         });
     }, []);
 

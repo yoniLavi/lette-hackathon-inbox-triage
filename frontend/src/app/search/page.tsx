@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { ContactBadge } from "@/components/ui/ContactBadge";
 import { searchEmails, senderDisplay } from "@/lib/crm";
 import type { CrmEmail } from "@/lib/crm";
+import { usePageData, buildSearchContext } from "@/lib/page-context";
 import { formatDistanceToNow } from "date-fns";
 
 export default function SearchPage() {
@@ -14,6 +15,7 @@ export default function SearchPage() {
     const [results, setResults] = useState<CrmEmail[]>([]);
     const [searched, setSearched] = useState(false);
     const [loading, setLoading] = useState(false);
+    const { setData } = usePageData();
 
     const handleSearch = useCallback(async (q: string) => {
         if (!q.trim()) return;
@@ -21,6 +23,11 @@ export default function SearchPage() {
         try {
             const emails = await searchEmails(q.trim());
             setResults(emails);
+            setData(buildSearchContext(q.trim(), emails.map(e => ({
+                subject: e.subject,
+                sender: senderDisplay(e),
+                dateSent: e.date_sent,
+            }))));
         } catch {
             setResults([]);
         } finally {
