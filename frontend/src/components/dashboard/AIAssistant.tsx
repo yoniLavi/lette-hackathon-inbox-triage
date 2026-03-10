@@ -47,13 +47,13 @@ function saveMessages(msgs: Message[]) {
 
 function usePageContext(): string {
     const pathname = usePathname();
-    if (pathname === "/") return "User is on the main dashboard, which shows priority queues (Critical/High/Medium/Low cases) and recent email activity.";
+    if (pathname === "/") return "User is on the main dashboard, which shows a work queue of cases needing attention (with action status badges like 'Draft ready', 'Needs triage', 'N actions pending'), priority queues (Critical/High cases), and work-centric stats (Pending Tasks, Drafts to Review, Resolved).";
     if (pathname.startsWith("/situations/")) {
         const id = pathname.split("/").pop();
-        return `User is viewing case/situation detail page (ID: ${id}). They can see the case summary, email communications, tasks, and draft responses.`;
+        return `User is viewing case/situation detail page (case ID: ${id}). They can see the AI summary, recommended actions (tasks), draft responses for review, communications grouped by thread with contact names and type badges, related contacts grouped by type, agent notes, and property context.`;
     }
-    if (pathname === "/properties") return "User is on the Properties page, which lists property accounts.";
-    if (pathname === "/search") return "User is on the Search page.";
+    if (pathname === "/properties") return "User is on the Properties page, which lists properties with case and contact counts.";
+    if (pathname === "/search") return "User is on the Search page, which searches emails via full-text search with contact resolution.";
     return `User is on page: ${pathname}`;
 }
 
