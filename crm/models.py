@@ -23,6 +23,7 @@ class Property(Base):
     type = Column(String(10))  # BTR / PRS
     units = Column(Integer)
     manager = Column(String(255))
+    manager_email = Column(String(255))
     description = Column(Text)
     challenge_id = Column(String(50), unique=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -105,5 +106,21 @@ class Note(Base):
     id = Column(Integer, primary_key=True)
     content = Column(Text)
     case_id = Column(Integer, ForeignKey("cases.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Thread(Base):
+    __tablename__ = "threads"
+
+    id = Column(Integer, primary_key=True)
+    thread_id = Column(String(100), unique=True, nullable=False)
+    subject = Column(String(500))
+    last_activity_at = Column(DateTime(timezone=True))
+    email_count = Column(Integer, default=0)
+    is_read = Column(Boolean, default=False)
+    case_id = Column(Integer, ForeignKey("cases.id"))
+    property_id = Column(Integer, ForeignKey("properties.id"))
+    contact_id = Column(Integer, ForeignKey("contacts.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())

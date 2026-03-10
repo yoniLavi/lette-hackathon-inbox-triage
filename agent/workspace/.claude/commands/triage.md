@@ -1,14 +1,37 @@
-Triage all unprocessed emails in the CRM.
+Show a prioritized overview of what needs attention right now.
 
-For each email:
-1. Search emails: `search_entity(entityType="Email", orderBy="dateSent", order="desc", limit=20)`
-2. For each email, `get_entity` to read the full body and dates
-3. Identify the sender — check if they're a known Contact or linked to an Account
-4. Classify urgency:
-   - **Emergency**: health/safety risks, floods, gas leaks, fires, lock-outs
-   - **Urgent**: rent arrears, RTB disputes, lease expiry within 30 days, compliance deadlines
-   - **Routine**: maintenance requests, general queries, lease renewals > 30 days
-   - **Low**: marketing, FYI, newsletters
-5. Summarize findings in a table: Subject | From | Urgency | Recommended Action
+## Steps
 
-After the table, list the top 3 recommended actions in priority order.
+1. Preview the queue:
+   ```bash
+   crm threads list --is-read false --order-by last_activity_at --order asc --limit 50
+   ```
+
+2. For each unread thread, classify urgency based on subject and age:
+   - **Emergency**: health/safety keywords (leak, flood, gas, fire, lockout, no heating, electrical hazard)
+   - **Urgent**: legal/compliance keywords (RTB, dispute, breach, HSE, inspection, deadline, arrears, expiring), or thread older than 48 hours
+   - **Routine**: maintenance, queries, renewals, scheduled work
+   - **Low**: newsletters, FYI, acknowledgments, marketing
+
+3. Check for approaching deadlines:
+   ```bash
+   crm tasks list --status not_started --order-by date_end --order asc --limit 10
+   ```
+
+4. Output a summary table:
+
+```
+## Current Queue
+
+| Priority | Thread | Subject | Emails | Age |
+|----------|--------|---------|--------|-----|
+| 🔴 Emergency | thread_001 | Water leak... | 3 | 2d |
+| ... | ... | ... | ... | ... |
+
+**Unread threads**: N total (E emergency, U urgent, R routine, L low)
+
+## Approaching Deadlines
+- [task name] — due [date] (case: [case name])
+```
+
+5. List the top 3 recommended next actions in priority order.

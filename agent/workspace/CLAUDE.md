@@ -17,6 +17,7 @@ crm cases list --status new --priority critical
 crm tasks list --case-id 3 --status not_started
 crm notes list --case-id 3
 crm properties list
+crm threads list --is-read false --order-by last_activity_at --order asc
 ```
 
 Response format: `{"list": [...], "total": N}`
@@ -26,11 +27,56 @@ Response format: `{"list": [...], "total": N}`
 crm emails get 42
 crm contacts get 7
 crm cases get 3
+crm threads get 1
+```
+
+### Get with related data (--include flag)
+```bash
+crm cases get 3 --include emails,tasks,notes,property
+crm threads get 1 --include emails,contact
+crm emails get 42 --include contact
+```
+
+Supported includes:
+- **cases**: `emails`, `tasks`, `notes`, `property`
+- **threads**: `emails`, `contact`
+- **emails**: `contact` (resolved from `from_address`)
+
+### Shift commands (thread-based processing)
+```bash
+# Get next unread thread with full case context (thread + emails + contact + case + tasks + notes + property)
+crm shift next
+
+# Mark thread as processed: batch-mark emails read, link to case
+crm shift complete --json '{"email_ids": [1,2,3], "thread_id": "thread_001", "case_id": 5}'
+```
+
+`crm shift next` returns:
+```json
+{
+  "thread": {
+    "id": 1, "thread_id": "thread_001", "subject": "...",
+    "last_activity_at": "...", "email_count": 3, "is_read": false,
+    "emails": [/* ordered by thread_position */],
+    "contact": {/* resolved from latest email's from_address */}
+  },
+  "case": {
+    "id": 5, "name": "...", "status": "...",
+    "emails": [...], "tasks": [...], "notes": [...],
+    "property": {/* including manager_email */}
+  }
+}
+```
+When no case exists yet (new thread), `case` is `null`.
+
+### Bulk email update
+```bash
+crm emails bulk-update --json '{"ids": [1,2,3], "updates": {"is_read": true}}'
 ```
 
 ### Create entities
 ```bash
-crm emails create --json '{"subject": "Re: Water leak", "body": "Draft reply...", "status": "draft", "from_address": "manager@manageco.ie", "to_addresses": ["tenant@gmail.com"]}'
+crm emails create --json '{"subject": "Re: Water leak", "body": "Draft reply...", "status": "draft", "from_address": "manager@manageco.ie", "to_addresses": ["tenant@gmail.com"], "thread_id": "thread_001", "case_id": 5}'
 crm cases create --json '{"name": "Agent Shift — 2026-03-08", "status": "in_progress", "priority": "normal"}'
 crm tasks create --json '{"name": "Assign emergency plumber", "status": "not_started", "priority": "urgent", "case_id": 3, "description": "..."}'
 crm notes create --json '{"content": "**Water Leak** (from Eoin Byrne) — Emergency. Drafted reply, created task.", "case_id": 3}'
@@ -48,6 +94,14 @@ crm emails delete 42
 ```
 
 ## Entity fields
+
+### Thread (derived entity — auto-maintained from emails)
+- `thread_id` — unique string matching Email.thread_id
+- `subject` — from the thread's first email
+- `last_activity_at` — most recent email's date_sent
+- `email_count` — number of emails in the thread
+- `is_read` — true only when ALL emails in the thread are read
+- `case_id`, `property_id`, `contact_id` — resolved from emails
 
 ### Email
 - `subject`, `from_address`, `to_addresses[]`, `cc_addresses[]`
@@ -76,7 +130,7 @@ crm emails delete 42
 - `content` (markdown), `case_id`
 
 ### Property
-- `name`, `type` (BTR/PRS), `units`, `manager`, `description`
+- `name`, `type` (BTR/PRS), `units`, `manager`, `manager_email`, `description`
 
 ## Page context
 
@@ -94,6 +148,7 @@ When drafting reply emails:
 - Use professional, concise tone appropriate for Irish property management.
 - Reference specific details from the original email — don't be generic.
 - For emergencies: acknowledge the issue, confirm immediate action, provide next steps and timelines.
+- Use the property's `manager_email` as the `from_address` when available.
 
 ## Task creation guidance
 
@@ -106,7 +161,7 @@ When creating Tasks:
 ## Shift journaling
 
 During a `/shift` run, you create a Case to journal your work:
-- One Note per processed email, summarizing what you found and what actions you took.
+- One Note per processed thread, summarizing what you found and what actions you took.
 - Close the Case with a final summary when the shift is done.
 
 ## Learnings file
@@ -114,6 +169,48 @@ During a `/shift` run, you create a Case to journal your work:
 When you discover operational patterns, gotchas, or effective techniques during email
 processing, append them to `/workspace/learnings.md`. Read the file first to avoid
 duplicates.
+
+## Irish BTR/PRS domain knowledge
+
+Use this knowledge when triaging emails and drafting responses. These are general
+regulatory and procedural facts — always check case-specific details.
+
+### Emergency response times
+- Fire alarm panel faults: resolve within 24 hours; interim fire watch may be required
+- Smart lock failures / lockouts: 30-minute master key dispatch target
+- Water leaks through light fittings: electrical hazard — advise tenant to avoid switches/outlets
+- Heating failures: habitability issue, especially with vulnerable tenants (elderly, infants)
+
+### Regulatory bodies and deadlines
+- **RTB** (Residential Tenancies Board): handles tenancy disputes, rent reviews, deposit disputes
+- **HSE Environmental Health**: enforces Housing Standards for Rented Houses Regulations 2019
+- **Dublin Fire Brigade (DFB)**: fire safety inspections with 28-day compliance deadlines
+- **RPZ** (Rent Pressure Zones): rent increases capped at 2% per year in designated areas
+- **LPT** (Local Property Tax): annual returns due by late March
+
+### Escalation cascade
+Recognize multi-stage situations — each step increases legal exposure:
+1. Tenant complaint (informal)
+2. RTB dispute filed (formal — deadlines apply)
+3. HSE inspection ordered (regulatory — mandatory access)
+4. Potential prosecution (if non-compliance persists)
+
+Mould/damp issues are especially sensitive — they can trigger parallel RTB + HSE tracks.
+
+### Standard procedures
+- **Tenant move-out**: final inspection → 10 business day deposit return timeline; service lift booking required in multi-unit buildings
+- **Subletting**: requires written consent, formal application, employment verification, RTB registration; 7-10 business day processing
+- **Gas safety certificates**: annual requirement per unit; schedule renewals before expiry
+- **Fire safety inspections**: maintain compliance records; non-compliances require remediation plan with timelines and contractor certifications
+
+### Insurance boundaries
+- Building-provided equipment (integrated appliances, washing machines) covered under building insurance, not tenant contents insurance
+- Tenants not liable for failures of building-provided equipment
+- Water damage from building equipment = building insurance claim
+
+### Pest control
+- Single-unit reports may indicate building-wide issues from common areas (bin stores, chutes)
+- Response: treat affected unit → inspect common area sources → survey neighboring units
 
 ## Working style
 

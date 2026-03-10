@@ -24,7 +24,7 @@ async def get_db():
 
 
 async def init_db():
-    """Create all tables and indexes."""
+    """Create all tables and indexes, apply lightweight migrations."""
     import models  # noqa: F401 — ensure models are registered on Base.metadata
 
     async with engine.begin() as conn:
@@ -36,5 +36,11 @@ async def init_db():
                 "ON emails USING gin("
                 "to_tsvector('english', coalesce(subject,'') || ' ' || coalesce(body,''))"
                 ")"
+            )
+        )
+        # Add manager_email column to properties if missing (lightweight migration)
+        await conn.execute(
+            text(
+                "ALTER TABLE properties ADD COLUMN IF NOT EXISTS manager_email VARCHAR(255)"
             )
         )

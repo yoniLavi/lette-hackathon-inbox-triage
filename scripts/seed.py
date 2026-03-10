@@ -36,13 +36,19 @@ def seed_properties(properties):
     """Create a Property per challenge property. Returns {challenge_id: crm_id}."""
     prop_map = {}
     for prop in properties:
-        created = api_post("properties", {
+        # Derive manager_email from manager name: "John Smith" → "john.smith@manageco.ie"
+        manager_name = prop["manager"]
+        manager_email = manager_name.lower().replace(" ", ".") + "@manageco.ie" if manager_name else None
+        payload = {
             "name": prop["name"],
             "type": prop["type"],
             "units": prop["units"],
-            "manager": prop["manager"],
+            "manager": manager_name,
             "challenge_id": prop["id"],
-        })
+        }
+        if manager_email:
+            payload["manager_email"] = manager_email
+        created = api_post("properties", payload)
         prop_map[prop["id"]] = created["id"]
         print(f"  Property: {prop['name']} → {created['id']}")
     return prop_map
