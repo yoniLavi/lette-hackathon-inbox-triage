@@ -207,6 +207,47 @@ def test_thread_is_read_when_all_emails_read(api):
     api.delete(f"/api/emails/{e2.json()['id']}")
 
 
+def test_thread_is_read_ignores_drafts(api):
+    """Draft replies should not make a thread appear unread."""
+    # Create a read archived email
+    e1 = api.post("/api/emails", json={
+        "subject": "Draft ignore test",
+        "from_address": "tenant@test.com",
+        "thread_id": "test_thread_drafts",
+        "thread_position": 1,
+        "date_sent": "2026-03-09T10:00:00Z",
+        "is_read": True,
+        "status": "archived",
+    })
+    assert e1.status_code == 201
+
+    # Thread should be read
+    r = api.get("/api/threads", params={"limit": 500})
+    thread = next((t for t in r.json()["list"] if t["thread_id"] == "test_thread_drafts"), None)
+    assert thread is not None
+    assert thread["is_read"] is True
+
+    # Add an unread draft reply to the same thread
+    draft = api.post("/api/emails", json={
+        "subject": "Re: Draft ignore test",
+        "from_address": "manager@manageco.ie",
+        "thread_id": "test_thread_drafts",
+        "thread_position": 2,
+        "is_read": False,
+        "status": "draft",
+    })
+    assert draft.status_code == 201
+
+    # Thread should STILL be read — drafts don't count
+    r = api.get("/api/threads", params={"limit": 500})
+    thread = next((t for t in r.json()["list"] if t["thread_id"] == "test_thread_drafts"), None)
+    assert thread["is_read"] is True
+
+    # Clean up
+    api.delete(f"/api/emails/{draft.json()['id']}")
+    api.delete(f"/api/emails/{e1.json()['id']}")
+
+
 # ---------------------------------------------------------------------------
 # Include parameter
 # ---------------------------------------------------------------------------

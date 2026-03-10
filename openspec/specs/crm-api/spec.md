@@ -48,9 +48,10 @@ The CRM API SHALL maintain Threads as a first-class entity, automatically derive
 - **THEN** the API recomputes the Thread's `last_activity_at`, `email_count`, and `is_read` from its emails
 
 #### Scenario: Thread is_read semantics
-- **WHEN** all emails in a thread have `is_read=true`
+- **WHEN** all non-draft emails in a thread have `is_read=true`
 - **THEN** the Thread's `is_read` SHALL be `true`
-- **AND** if any email in the thread has `is_read=false`, the Thread's `is_read` SHALL be `false`
+- **AND** if any non-draft email in the thread has `is_read=false`, the Thread's `is_read` SHALL be `false`
+- **AND** draft emails (status="draft") SHALL NOT affect the thread's `is_read` computation
 
 #### Scenario: List threads
 - **WHEN** a client sends `GET /api/threads?is_read=false&order_by=last_activity_at&order=asc`

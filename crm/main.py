@@ -150,15 +150,27 @@ async def _upsert_thread(db: AsyncSession, thread_id_str: str):
     if not thread_id_str:
         return
 
-    # Aggregate from emails with this thread_id
+    # Aggregate from emails with this thread_id.
+    # Exclude drafts from is_read computation — drafts are outgoing and shouldn't
+    # make a thread appear "unread". A thread is unread if any non-draft email is unread.
     q = select(
         func.count(Email.id).label("cnt"),
         func.max(Email.date_sent).label("last_activity"),
-        func.bool_and(Email.is_read).label("all_read"),
         func.min(Email.subject).label("subject"),
         func.max(Email.case_id).label("case_id"),
     ).where(Email.thread_id == thread_id_str)
     row = (await db.execute(q)).one()
+
+    # is_read: true only when all non-draft emails are read
+    read_q = select(
+        func.bool_and(Email.is_read).label("all_read"),
+    ).where(
+        Email.thread_id == thread_id_str,
+        Email.status != "draft",
+    )
+    read_row = (await db.execute(read_q)).one()
+    # If there are no non-draft emails, treat as read
+    all_read = read_row.all_read if read_row.all_read is not None else True
 
     if row.cnt == 0:
         # No emails left — delete thread if it exists
@@ -200,7 +212,7 @@ async def _upsert_thread(db: AsyncSession, thread_id_str: str):
         thread.subject = row.subject
         thread.last_activity_at = row.last_activity
         thread.email_count = row.cnt
-        thread.is_read = bool(row.all_read)
+        thread.is_read = bool(all_read)
         thread.case_id = row.case_id
         thread.contact_id = contact_id
         thread.property_id = property_id
@@ -211,7 +223,7 @@ async def _upsert_thread(db: AsyncSession, thread_id_str: str):
             subject=row.subject,
             last_activity_at=row.last_activity,
             email_count=row.cnt,
-            is_read=bool(row.all_read),
+            is_read=bool(all_read),
             case_id=row.case_id,
             contact_id=contact_id,
             property_id=property_id,

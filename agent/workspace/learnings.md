@@ -71,6 +71,7 @@ improvements between shifts.
 - Use `--include` flag on `get` commands to load related data in one call (e.g., `crm cases get 3 --include emails,tasks,notes,property`)
 - `crm shift next` pre-loads thread + emails + contact + case + tasks + notes + property — use this during shifts instead of individual lookups
 - Date range filters available: `--date-end-before`, `--date-end-after`, `--date-sent-before`, `--date-sent-after` (ISO dates)
+- Draft emails do NOT affect thread.is_read — only archived/sent emails count. So creating a draft reply won't make a thread reappear as "unread"
 
 ## BTR/PRS Emergency Patterns
 
