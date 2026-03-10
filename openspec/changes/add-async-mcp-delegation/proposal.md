@@ -28,7 +28,14 @@ A lightweight AI (e.g., direct Claude API call within the FastAPI process) handl
 - Prompt engineering has high impact: the agent currently over-queries (4-6 sequential searches when 1 would suffice). Better CLAUDE.md guidance should be part of any approach.
 - The reasoning trace filtering (text_parts.clear() on ToolUseBlock) already improves perceived quality, but latency remains unacceptable for interactive use.
 
+### Page context as AI context
+The chat widget already passes a `context` field with each prompt (from `usePageContext()` in AIAssistant.tsx). Currently this is a static text description of the page. We should enrich it with **actual on-screen data** — the case object, tasks, property, contacts, stats — so the conversational AI can answer many questions instantly from what the user already sees, without any CRM calls.
+
+For example, on `/situations/42` the context would include the case name, priority, property name, task count, draft status, and contact names. "What's the status of this case?" or "who's involved?" could be answered in <1s from context alone.
+
+This directly serves the <3s response goal and reduces CRM load for the most common queries (asking about what's already on screen).
+
 ## Impact
-- Affected specs: `agent-api` (response latency, streaming behavior, possibly new worker architecture)
-- Affected code: `agent/api.py`, `agent/workspace/CLAUDE.md`, possibly new conversational AI module
-- Depends on: `add-chat-widget` (multi-turn fix, SSE streaming — both done)
+- Affected specs: `agent-api` (response latency, streaming behavior, possibly new worker architecture), `frontend-app` (page context enrichment)
+- Affected code: `agent/api.py`, `agent/workspace/CLAUDE.md`, `frontend/src/components/dashboard/AIAssistant.tsx`, possibly new conversational AI module
+- Depends on: `add-chat-widget` (multi-turn fix, SSE streaming — both done), `update-frontend-data-model` (archived — provides rich CRM types and include params)
