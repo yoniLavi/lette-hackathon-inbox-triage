@@ -1,8 +1,8 @@
 """Agent API — two-tier AI architecture with Frontend AI and Worker AI.
 
-Frontend AI: user-facing, answers from page context or delegates CRM work.
-Worker AI: CRM agent with crm CLI access, domain knowledge, shift skills.
-Delegation: in-process MCP server bridges the two asynchronously.
+Frontend AI: direct Anthropic/Bedrock Messages API, answers from page context
+or delegates CRM work via in-process tool dispatch.
+Worker AI: Claude Code SDK session with crm CLI access, domain knowledge, shift skills.
 """
 
 import asyncio
@@ -24,14 +24,14 @@ from claude_code_sdk.types import (
     AssistantMessage,
     ClaudeCodeOptions,
     TextBlock,
-    ToolResultBlock,
     ToolUseBlock,
 )
 
 import mcp_worker
+from frontend_ai import FrontendAI
 
 # ---------------------------------------------------------------------------
-# SDK options
+# SDK options (Worker AI only — Frontend AI uses direct Messages API)
 # ---------------------------------------------------------------------------
 WORKER_OPTIONS = ClaudeCodeOptions(
     cwd="/workspace",
@@ -66,32 +66,20 @@ draftCount, contactNames[]
 - Search (page: "search"): query, resultCount, topResults[]
 """
 
-FRONTEND_OPTIONS = ClaudeCodeOptions(
-    cwd="/tmp",
-    permission_mode="bypassPermissions",
-    model="eu.anthropic.claude-sonnet-4-20250514-v1:0",
-    extra_args={"effort": "low"},
-    append_system_prompt=FRONTEND_SYSTEM_PROMPT,
-    mcp_servers={"worker_delegation": mcp_worker.delegation_server},
-    allowed_tools=[
-        "mcp__worker_delegation__delegate_to_worker",
-        "mcp__worker_delegation__get_worker_result",
-    ],
-    max_turns=10,
-)
+FRONTEND_MODEL = "eu.anthropic.claude-sonnet-4-20250514-v1:0"
 
 # ---------------------------------------------------------------------------
 # Session state
 # ---------------------------------------------------------------------------
 _RESPONSE_TIMEOUT = 300  # seconds per message
 
-# Worker AI
+# Worker AI (Claude Code SDK)
 _worker_client: ClaudeSDKClient | None = None
 _worker_session_id: str | None = None
 _worker_msg_count: int = 0
 
-# Frontend AI
-_frontend_client: ClaudeSDKClient | None = None
+# Frontend AI (direct Messages API)
+_frontend_ai: FrontendAI | None = None
 _frontend_session_id: str | None = None
 _frontend_msg_count: int = 0
 
@@ -120,29 +108,43 @@ async def _teardown_worker() -> None:
     _worker_msg_count = 0
 
 
-async def _ensure_frontend() -> ClaudeSDKClient:
-    global _frontend_client, _frontend_session_id
-    if _frontend_client is None:
-        _frontend_client = ClaudeSDKClient(options=FRONTEND_OPTIONS)
-        await _frontend_client.connect()
+async def _handle_tool(
+    tool_name: str,
+    tool_input: dict,
+    sse_queue: asyncio.Queue | None,
+) -> str:
+    """In-process tool dispatch for Frontend AI delegation tools."""
+    if tool_name == "delegate_to_worker":
+        return await mcp_worker.delegate_to_worker(tool_input["prompt"])
+    elif tool_name == "get_worker_result":
+        return await mcp_worker.get_worker_result(tool_input["task_id"])
+    else:
+        return json.dumps({"error": f"Unknown tool: {tool_name}"})
+
+
+def _ensure_frontend() -> FrontendAI:
+    global _frontend_ai, _frontend_session_id
+    if _frontend_ai is None:
+        _frontend_ai = FrontendAI(
+            system_prompt=FRONTEND_SYSTEM_PROMPT,
+            model=FRONTEND_MODEL,
+            tool_handler=_handle_tool,
+        )
         _frontend_session_id = str(uuid.uuid4())
-        log.info("[frontend] connected session=%s", _frontend_session_id)
-    return _frontend_client
+        log.info("[frontend] initialized session=%s", _frontend_session_id)
+    return _frontend_ai
 
 
-async def _teardown_frontend() -> None:
-    global _frontend_client, _frontend_session_id, _frontend_msg_count
-    if _frontend_client is not None:
-        try:
-            await _frontend_client.disconnect()
-        except Exception:
-            pass
-        _frontend_client = None
+def _teardown_frontend() -> None:
+    global _frontend_ai, _frontend_session_id, _frontend_msg_count
+    if _frontend_ai is not None:
+        _frontend_ai.reset()
+    _frontend_ai = None
     _frontend_session_id = None
     _frontend_msg_count = 0
 
 
-# Wire up MCP worker with our ensure_worker function
+# Wire up worker dispatch with our ensure_worker function
 mcp_worker.configure(ensure_worker=_ensure_worker)
 
 
@@ -152,7 +154,7 @@ mcp_worker.configure(ensure_worker=_ensure_worker)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
-    await _teardown_frontend()
+    _teardown_frontend()
     await _teardown_worker()
 
 
@@ -185,11 +187,6 @@ def _sse_event(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-def _is_delegation_tool(name: str) -> bool:
-    """Check if a tool call is a delegation MCP tool (hide from user)."""
-    return "delegate_to_worker" in name or "get_worker_result" in name
-
-
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -206,33 +203,24 @@ async def prompt(req: PromptRequest) -> PromptResponse:
     t0 = _time.monotonic()
     log.info("[prompt] query: %s", req.message[:120])
     try:
-        client = await _ensure_frontend()
+        frontend = _ensure_frontend()
         prompt_text = req.message
         if req.context:
             prompt_text = f"[Page context: {req.context}]\n\n{req.message}"
-        await client.query(prompt_text)
 
-        text_parts: list[str] = []
-        async for msg in client.receive_response():
-            if isinstance(msg, AssistantMessage):
-                for block in msg.content:
-                    if isinstance(block, ToolUseBlock):
-                        text_parts.clear()
-                    elif isinstance(block, TextBlock):
-                        text_parts.append(block.text)
-
+        response_text = await frontend.chat(prompt_text)
         _frontend_msg_count += 1
-        log.info("[prompt] done in %.0fs", _time.monotonic() - t0)
+        log.info("[prompt] done in %.1fs", _time.monotonic() - t0)
 
         return PromptResponse(
-            response="\n\n".join(text_parts) or "(no response)",
+            response=response_text,
             session_id=_frontend_session_id or "",
         )
     except HTTPException:
         raise
     except Exception as exc:
-        log.error("[prompt] error after %.0fs: %s", _time.monotonic() - t0, exc)
-        await _teardown_frontend()
+        log.error("[prompt] error after %.1fs: %s", _time.monotonic() - t0, exc)
+        _teardown_frontend()
         raise HTTPException(status_code=500, detail=str(exc))
     finally:
         _busy = False
@@ -242,9 +230,9 @@ async def prompt(req: PromptRequest) -> PromptResponse:
 async def prompt_stream(req: PromptRequest):
     """SSE streaming endpoint — two-tier: Frontend AI answers or delegates to Worker.
 
-    Uses an asyncio.Queue to bridge between the SDK consumer and the SSE generator.
-    Worker tool_use events are pushed to the same queue by the MCP handler, so the
-    user sees CRM tool progress in real time even while the Frontend AI waits.
+    Frontend AI text events stream immediately. Worker tool_use events are pushed
+    to the same queue by the worker dispatch, so the user sees CRM tool progress
+    in real time.
     """
     global _busy
 
@@ -261,7 +249,7 @@ async def prompt_stream(req: PromptRequest):
             # Wire up worker events to this stream's queue
             mcp_worker.set_sse_queue(queue)
 
-            client = await _ensure_frontend()
+            frontend = _ensure_frontend()
             log.info("[stream] frontend ready, session=%s msg_count=%d",
                      _frontend_session_id, _frontend_msg_count)
             await queue.put(_sse_event("status", {"status": "thinking"}))
@@ -270,48 +258,24 @@ async def prompt_stream(req: PromptRequest):
             if req.context:
                 prompt_text = f"[Page context: {req.context}]\n\n{req.message}"
 
-            log.info("[stream] calling frontend AI query()...")
-            await asyncio.wait_for(client.query(prompt_text), timeout=_RESPONSE_TIMEOUT)
-            log.info("[stream] query() returned, starting receive_response()...")
-
-            text_parts: list[str] = []
-            loop = asyncio.get_event_loop()
-            cm = asyncio.timeout_at(loop.time() + _RESPONSE_TIMEOUT)
-            async with cm:
-                async for msg in client.receive_response():
-                    cm.reschedule(loop.time() + _RESPONSE_TIMEOUT)
-                    if isinstance(msg, AssistantMessage):
-                        for block in msg.content:
-                            if isinstance(block, ToolUseBlock):
-                                if not _is_delegation_tool(block.name):
-                                    await queue.put(
-                                        _sse_event("tool_use", {"tool": block.name})
-                                    )
-                                else:
-                                    log.info("[stream] delegation: %s", block.name)
-                                text_parts.clear()
-                            elif isinstance(block, ToolResultBlock):
-                                pass  # handled internally by SDK
-                            elif isinstance(block, TextBlock):
-                                log.info("[stream] text: %s...", block.text[:80])
-                                text_parts.append(block.text)
-                                await queue.put(
-                                    _sse_event("text", {"text": block.text})
-                                )
+            response_text = await asyncio.wait_for(
+                frontend.chat(prompt_text, sse_queue=queue),
+                timeout=_RESPONSE_TIMEOUT,
+            )
 
             _frontend_msg_count += 1
             await queue.put(
-                _sse_event("done", {"response": "\n\n".join(text_parts) or "(no response)"})
+                _sse_event("done", {"response": response_text})
             )
         except TimeoutError:
-            log.error("[stream] timeout — no messages for %ds", _RESPONSE_TIMEOUT)
-            await _teardown_frontend()
+            log.error("[stream] timeout — no response within %ds", _RESPONSE_TIMEOUT)
+            _teardown_frontend()
             await queue.put(
                 _sse_event("error", {"detail": f"Response timed out after {_RESPONSE_TIMEOUT}s. Please try again."})
             )
         except Exception as exc:
             log.error("[stream] error: %s", exc)
-            await _teardown_frontend()
+            _teardown_frontend()
             await queue.put(_sse_event("error", {"detail": str(exc)}))
         finally:
             mcp_worker.set_sse_queue(None)
@@ -411,7 +375,7 @@ async def shift():
 async def restart_session():
     global _busy
     _busy = False
-    await _teardown_frontend()
+    _teardown_frontend()
     await _teardown_worker()
     return {"status": "restarted"}
 

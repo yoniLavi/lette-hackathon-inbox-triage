@@ -23,6 +23,7 @@ RUN cd /app && uv sync --no-dev
 
 COPY api.py /app/api.py
 COPY mcp_worker.py /app/mcp_worker.py
+COPY frontend_ai.py /app/frontend_ai.py
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 

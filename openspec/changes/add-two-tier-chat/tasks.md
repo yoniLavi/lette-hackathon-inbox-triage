@@ -43,25 +43,25 @@
 - [x] 8.3 Timed tests: fast path 3.7-8.2s, CRM delegation 20-52s with two-phase streaming
 
 ## 9. Direct API for Frontend AI (v2 — bypass Claude Code SDK overhead)
-- [ ] 9.1 Add `anthropic` to agent/pyproject.toml dependencies
-- [ ] 9.2 Create `agent/frontend_ai.py` — direct Bedrock Messages API client
+- [x] 9.1 Add `anthropic` to agent/pyproject.toml dependencies
+- [x] 9.2 Create `agent/frontend_ai.py` — direct Bedrock Messages API client
   - AnthropicBedrock client with aws_bearer_token + aws_region from env
   - In-process conversation history (list of messages)
   - System prompt (reuse existing FRONTEND_SYSTEM_PROMPT)
   - Two tool definitions: delegate_to_worker, get_worker_result (JSON schema)
-  - Streaming response via messages.stream() or messages.create(stream=True)
+  - Non-streaming messages.create() via asyncio.to_thread (avoids blocking event loop)
   - Tool execution loop: when model returns tool_use, execute in-process, send tool_result, continue
-- [ ] 9.3 Implement in-process tool dispatch (replaces MCP server for frontend)
+- [x] 9.3 Implement in-process tool dispatch (replaces MCP server for frontend)
   - delegate_to_worker: reuse existing _run_worker logic from mcp_worker.py
   - get_worker_result: reuse existing future-based polling logic
   - Worker tool_use events still pushed to SSE queue
-- [ ] 9.4 Update api.py: replace ClaudeSDKClient frontend with frontend_ai module
-  - _ensure_frontend / _teardown_frontend now manage AnthropicBedrock client + message history
-  - /prompt/stream _consume() calls frontend_ai instead of SDK
-  - /prompt (non-streaming) also uses frontend_ai
+- [x] 9.4 Update api.py: replace ClaudeSDKClient frontend with frontend_ai module
+  - _ensure_frontend / _teardown_frontend now manage FrontendAI instance + message history
+  - /prompt/stream _consume() calls frontend_ai.chat() instead of SDK
+  - /prompt (non-streaming) also uses frontend_ai.chat()
   - Session restart clears conversation history
-- [ ] 9.5 Update docker-compose.yml: bind-mount frontend_ai.py
-- [ ] 9.6 Simplify mcp_worker.py: remove MCP server creation, keep only worker dispatch logic
+- [x] 9.5 Update docker-compose.yml: bind-mount frontend_ai.py
+- [x] 9.6 Simplify mcp_worker.py: remove MCP server creation, keep only worker dispatch logic
 
 ## 10. Testing & validation (v2)
 - [ ] 10.1 Integration tests pass (24/24)

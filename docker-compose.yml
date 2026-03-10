@@ -40,6 +40,7 @@ services:
     volumes:
       - ./agent/api.py:/app/api.py
       - ./agent/mcp_worker.py:/app/mcp_worker.py
+      - ./agent/frontend_ai.py:/app/frontend_ai.py
       - ./agent/entrypoint.sh:/app/entrypoint.sh
       - ./agent/workspace:/workspace
       - ./crm-cli:/opt/crm-cli

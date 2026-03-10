@@ -1,6 +1,6 @@
-"""Delegation MCP server — async bridge between Frontend AI and Worker AI.
+"""Worker dispatch — async bridge between Frontend AI and Worker AI.
 
-Provides two tools for the Frontend AI:
+Provides two tool handler functions for the Frontend AI:
 - delegate_to_worker(prompt) — queue a CRM query, returns task ID immediately
 - get_worker_result(task_id) — poll/wait for the worker's response
 
@@ -14,10 +14,9 @@ import logging
 import uuid
 from typing import Any, Awaitable, Callable
 
-from claude_code_sdk import create_sdk_mcp_server, tool
 from claude_code_sdk.types import AssistantMessage, TextBlock, ToolUseBlock
 
-log = logging.getLogger("agent.mcp")
+log = logging.getLogger("agent.worker")
 
 # ---------------------------------------------------------------------------
 # Dependencies — injected by api.py via configure()
@@ -84,92 +83,40 @@ async def _run_worker(task_id: str, prompt: str, future: asyncio.Future[str]) ->
 
 
 # ---------------------------------------------------------------------------
-# MCP tools
+# Tool dispatch functions — called by FrontendAI tool handler
 # ---------------------------------------------------------------------------
-@tool(
-    "delegate_to_worker",
-    "Delegate a CRM query to the Worker AI. Returns a task ID immediately. "
-    "The worker has full CRM access (emails, contacts, cases, tasks, threads, properties). "
-    "Send a clear, natural-language prompt describing what CRM data or action you need.",
-    {"prompt": str},
-)
-async def delegate_to_worker(args: dict) -> dict:
-    prompt = args["prompt"]
+async def delegate_to_worker(prompt: str) -> str:
+    """Queue a CRM query for the Worker AI. Returns JSON with task_id."""
     task_id = str(uuid.uuid4())[:8]
     log.info("[delegate] task=%s prompt=%s", task_id, prompt[:120])
 
     if _worker_busy:
-        return {
-            "content": [
-                {
-                    "type": "text",
-                    "text": json.dumps(
-                        {"error": "Worker is busy with another task. Please wait and retry."}
-                    ),
-                }
-            ],
-            "is_error": True,
-        }
+        return json.dumps({"error": "Worker is busy with another task. Please wait and retry."})
 
     future: asyncio.Future[str] = asyncio.get_event_loop().create_future()
     _tasks[task_id] = future
     asyncio.create_task(_run_worker(task_id, prompt, future))
 
-    return {
-        "content": [
-            {"type": "text", "text": json.dumps({"task_id": task_id, "status": "queued"})}
-        ]
-    }
+    return json.dumps({"task_id": task_id, "status": "queued"})
 
 
-@tool(
-    "get_worker_result",
-    "Get the result of a delegated Worker AI task. "
-    "Returns the worker's full response text if complete, or a still_working status. "
-    "Call this after delegate_to_worker to retrieve the CRM data.",
-    {"task_id": str},
-)
-async def get_worker_result(args: dict) -> dict:
-    task_id = args["task_id"]
+async def get_worker_result(task_id: str) -> str:
+    """Get the result of a delegated task. Returns worker text or status JSON."""
     future = _tasks.get(task_id)
 
     if future is None:
-        return {
-            "content": [
-                {"type": "text", "text": json.dumps({"error": f"Unknown task_id: {task_id}"})}
-            ],
-            "is_error": True,
-        }
+        return json.dumps({"error": f"Unknown task_id: {task_id}"})
 
     if not future.done():
         try:
             await asyncio.wait_for(asyncio.shield(future), timeout=60.0)
         except asyncio.TimeoutError:
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps({"task_id": task_id, "status": "still_working"}),
-                    }
-                ]
-            }
+            return json.dumps({"task_id": task_id, "status": "still_working"})
 
     try:
         result = future.result()
         del _tasks[task_id]
-        return {"content": [{"type": "text", "text": result}]}
+        return result
     except Exception as exc:
         del _tasks[task_id]
-        return {
-            "content": [{"type": "text", "text": json.dumps({"error": str(exc)})}],
-            "is_error": True,
-        }
-
-
-# ---------------------------------------------------------------------------
-# Pre-built server config — imported by api.py
-# ---------------------------------------------------------------------------
-delegation_server = create_sdk_mcp_server(
-    "worker_delegation",
-    tools=[delegate_to_worker, get_worker_result],
-)
+        return json.dumps({"error": str(exc)})
