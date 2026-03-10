@@ -14,48 +14,55 @@ The frontend SHALL be containerized as a Next.js standalone build, served via `n
 #### Scenario: Environment configuration
 - **WHEN** the frontend container starts
 - **THEN** it reads `NEXT_PUBLIC_AGENT_URL` for client-side agent API calls
-- **AND** it reads `ESPOCRM_URL` and `ESPOCRM_API_KEY` for server-side CRM data fetching
+- **AND** it reads `CRM_API_URL` for server-side CRM data fetching (default: `http://crm-api:8002`)
 
 ### Requirement: CRM Data Layer
-The frontend SHALL fetch data from EspoCRM's REST API on the server side, using Next.js server components and API routes.
+The frontend SHALL fetch data from the CRM API on the server side, using Next.js server components and API routes via a `/api/crm` proxy.
 
-#### Scenario: Fetch cases for dashboard
+#### Scenario: Fetch cases for dashboard work queue
 - **WHEN** the dashboard page loads
-- **THEN** the server fetches Cases from EspoCRM ordered by priority and updated date
-- **AND** renders them as situation cards grouped by urgency tier
+- **THEN** the server fetches Cases from the CRM API ordered by priority and updated date, with `?include=property`
+- **AND** for each case, fetches linked task and draft email counts to derive action status
+- **AND** renders them as a work queue with action-oriented status badges
 
 #### Scenario: Fetch case detail
 - **WHEN** a user navigates to `/situations/[id]`
-- **THEN** the server fetches the Case by ID along with its linked Emails, Tasks, and Account
-- **AND** displays the AI summary, communications timeline, recommended actions, and any draft replies
+- **THEN** the server fetches the Case by ID with `?include=emails,tasks,notes,property`
+- **AND** displays recommended actions (tasks) and draft responses first, then AI summary and communications as supporting context
 
-#### Scenario: Fetch accounts for properties page
-- **WHEN** the properties page loads
-- **THEN** the server fetches Accounts from EspoCRM with counts of linked Cases and Emails
-
-#### Scenario: Activity stream from emails
-- **WHEN** the dashboard page loads
-- **THEN** the activity stream shows the most recent Emails from CRM, ordered by date
+#### Scenario: Full-text email search
+- **WHEN** a user enters a query on the search page
+- **THEN** the frontend calls `GET /api/emails?search={query}` with `?include=contact`
+- **AND** displays matching emails with subject, sender contact info, date, and body snippet
 
 #### Scenario: Live stats
 - **WHEN** the dashboard page loads
-- **THEN** QuickStats shows live counts: total emails today, open tasks, and closed cases
+- **THEN** QuickStats shows work-centric counts: pending tasks (not completed), drafts to review (emails with status "draft"), and resolved cases (status "closed")
 
 ### Requirement: Simplified Situation Detail
-The situation detail page SHALL display CRM-backed data without hardcoded rich content that has no CRM backing.
+The situation detail page SHALL display CRM-backed data in a task-first layout, leading with actionable items and using communications as supporting context.
 
-#### Scenario: CRM-backed content only
+#### Scenario: Task-first content hierarchy
 - **WHEN** a situation detail page renders
-- **THEN** it shows: Case name, priority badge, AI summary (from Case description), linked Emails as a timeline, linked Tasks as recommended actions, and any draft Email as a response template
+- **THEN** it shows in order: Case name and priority badge, AI summary (from Case description), recommended actions (Tasks) with completion status, draft responses for review/sending, then communications timeline grouped by thread as expandable context
 - **AND** it does NOT show hardcoded financial exposure breakdowns, urgency rationale boxes, or tag pills
 
-### Requirement: Simplified Properties Page
-The properties page SHALL display Accounts from EspoCRM with aggregate counts, without fabricated property statistics.
+#### Scenario: Agent notes display
+- **WHEN** a case has linked Notes
+- **THEN** they are displayed in a dedicated section on the right panel showing note content and timestamp
+- **AND** ordered chronologically (oldest first)
 
-#### Scenario: Account-based property view
+#### Scenario: Related contacts display
+- **WHEN** a case has emails from known Contacts
+- **THEN** a "Related Contacts" section on the right panel shows each contact's name and type badge (tenant, landlord, contractor, etc.), grouped by contact type
+
+### Requirement: Simplified Properties Page
+The properties page SHALL display Properties from the CRM API with aggregate context.
+
+#### Scenario: Property cards with context
 - **WHEN** the properties page loads
-- **THEN** each property card shows the Account name and counts of linked Cases and Emails
-- **AND** does NOT show fabricated unit counts, occupancy rates, or response time stats
+- **THEN** each property card shows the property name, type, units, manager name, and counts of linked Cases and Contacts
+- **AND** does NOT show fabricated occupancy rates or response time stats
 
 ### Requirement: Live Chat Widget
 The frontend SHALL include a floating chat widget that sends messages to the agent API via SSE streaming and displays real responses with live progress updates.
@@ -67,9 +74,9 @@ The frontend SHALL include a floating chat widget that sends messages to the age
 - **AND** renders the agent's markdown response when the `done` event arrives
 
 #### Scenario: Live tool updates
-- **WHEN** the agent uses MCP tools during processing
+- **WHEN** the agent uses tools during processing
 - **THEN** the widget displays the tool name in the status indicator as each `tool_use` SSE event arrives
-- **AND** updates are visible within seconds of the tool being invoked (no long "Thinking..." gaps)
+- **AND** updates are visible within seconds of the tool being invoked
 
 #### Scenario: Agent is busy
 - **WHEN** a user sends a message while the agent is already processing another request
@@ -93,4 +100,56 @@ The frontend SHALL include a floating chat widget that sends messages to the age
 #### Scenario: Message persistence
 - **WHEN** the page is reloaded (e.g., via hot-reload during development)
 - **THEN** previous chat messages are restored from sessionStorage
+
+### Requirement: CRM Data Types
+The frontend SHALL define TypeScript types that accurately reflect the CRM API's data model, in a module named `crm.ts`.
+
+#### Scenario: Type coverage
+- **WHEN** frontend code imports CRM types
+- **THEN** types are available for all CRM entities: Property, Contact, Email, Task, Case, Note, and Thread
+- **AND** each type includes all fields returned by the CRM API (including `manager_email` on Property, `is_important` on Email, all Thread fields)
+
+#### Scenario: Include response typing
+- **WHEN** a fetch function uses `?include=` parameters
+- **THEN** the response type reflects the included nested data (e.g., `emails: CrmEmail[]`, `contact: CrmContact | null`, `property: CrmProperty | null`)
+
+### Requirement: Contact Resolution
+The frontend SHALL resolve email senders to Contact records and display contact name and type instead of raw email addresses.
+
+#### Scenario: Contact on email/thread display
+- **WHEN** an email or thread is displayed anywhere in the UI
+- **THEN** the sender's full name (`first_name last_name`) and contact type are shown
+- **AND** the contact type is rendered as a colored badge (tenant, landlord, contractor, prospect, internal, legal)
+
+#### Scenario: Unknown contact fallback
+- **WHEN** an email's `from_address` does not match any Contact in the CRM
+- **THEN** the frontend falls back to displaying the raw email address
+
+### Requirement: Action-Oriented Case Status
+SituationCards on the dashboard SHALL display an action-oriented status text derived from the case's linked tasks and emails, providing at-a-glance next-action context.
+
+#### Scenario: Draft ready for review
+- **WHEN** a case has at least one email with `status: "draft"`
+- **THEN** the SituationCard shows "Draft ready" as the action status
+
+#### Scenario: Needs triage
+- **WHEN** a case has no tasks and no draft emails
+- **THEN** the SituationCard shows "Needs triage" as the action status
+
+#### Scenario: Tasks pending
+- **WHEN** a case has tasks with `status != "completed"` and no draft emails
+- **THEN** the SituationCard shows the count of pending tasks (e.g. "3 actions pending")
+
+### Requirement: Work-Centric Dashboard
+The dashboard SHALL present a work-item-focused view oriented around case review, rather than raw email display. The human user reviews AI-triaged work — they do not process raw emails.
+
+#### Scenario: Work queue replaces email feed
+- **WHEN** the dashboard loads
+- **THEN** the center column shows a work queue of all open cases with action status, ordered by priority then recency
+- **AND** does NOT show a flat list of recent emails
+
+#### Scenario: Work-centric stats
+- **WHEN** the dashboard loads
+- **THEN** QuickStats shows: count of pending tasks, count of draft responses awaiting review, and count of resolved (closed) cases
+- **AND** does NOT show total email count as a primary metric
 
