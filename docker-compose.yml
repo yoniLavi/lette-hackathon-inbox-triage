@@ -39,6 +39,7 @@ services:
       CRM_API_URL: http://crm-api:8002
     volumes:
       - ./agent/api.py:/app/api.py
+      - ./agent/mcp_worker.py:/app/mcp_worker.py
       - ./agent/entrypoint.sh:/app/entrypoint.sh
       - ./agent/workspace:/workspace
       - ./crm-cli:/opt/crm-cli

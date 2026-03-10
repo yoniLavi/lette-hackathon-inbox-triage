@@ -268,7 +268,7 @@ export function AIAssistant() {
                                         ? "bg-[#0000EE] text-white rounded-tr-none"
                                         : "bg-slate-50 border border-slate-100 text-[#0F1016] rounded-tl-none"
                                         }`}>
-                                        <div className={`text-[14px] leading-relaxed ${msg.role === "assistant" ? "font-serif" : "font-sans font-medium whitespace-pre-line"}`}>
+                                        <div className={`text-[14px] leading-relaxed ${msg.role === "assistant" ? "font-serif chat-markdown" : "font-sans font-medium whitespace-pre-line"}`}>
                                             {msg.role === "assistant"
                                                 ? <ReactMarkdown>{msg.content}</ReactMarkdown>
                                                 : msg.content}
@@ -283,7 +283,7 @@ export function AIAssistant() {
                             {loading && streamingText && (
                                 <div className="flex justify-start">
                                     <div className="max-w-[85%] rounded-[24px] p-4 bg-slate-50 border border-slate-100 text-[#0F1016] rounded-tl-none">
-                                        <div className="text-[14px] leading-relaxed font-serif">
+                                        <div className="text-[14px] leading-relaxed font-serif chat-markdown">
                                             <ReactMarkdown>{streamingText}</ReactMarkdown>
                                         </div>
                                         {statusText && (

@@ -52,3 +52,41 @@ body {
   background: #94a3b8;
   /* slate-400 */
 }
+
+/* Chat markdown spacing — ReactMarkdown strips default margins */
+.chat-markdown p,
+.chat-markdown ul,
+.chat-markdown ol,
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3,
+.chat-markdown h4 {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.chat-markdown p:first-child,
+.chat-markdown h1:first-child,
+.chat-markdown h2:first-child,
+.chat-markdown h3:first-child,
+.chat-markdown h4:first-child {
+  margin-top: 0;
+}
+
+.chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-markdown ul,
+.chat-markdown ol {
+  padding-left: 1.25em;
+}
+
+.chat-markdown li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.chat-markdown strong {
+  font-weight: 700;
+}
