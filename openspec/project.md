@@ -5,11 +5,11 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 
 ## Tech Stack
 - Docker Compose (orchestration for the full stack)
-- EspoCRM (open-source CRM with email integration, REST API)
-- EspoMCP (MCP server bridging Claude to EspoCRM)
+- CRM API — custom FastAPI + PostgreSQL with full-text search (port 8002)
+- CRM CLI — `crm` command-line tool for agent ↔ CRM interaction (no MCP overhead)
 - Claude Code + Anthropic Agent SDK (agentic AI layer)
 - Python (seed scripts, utilities)
-- TBD: A webUI frontend
+- Next.js frontend (port 3000)
 
 ## Project Conventions
 
@@ -20,13 +20,13 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 
 ### Scripts
 - All Python scripts in `scripts/` use a `uv` shebang (`#!/usr/bin/env -S uv run --script`) so they can be run directly: `scripts/agent.py "prompt"` (no `uv run` prefix needed)
-- Key scripts: `scripts/agent.py` (run agent prompts), `scripts/espo_cli.py` (EspoCRM REST API), `scripts/seed.py`, `scripts/reset.py`, `scripts/reseed.py`, `scripts/create_api_user.py`
+- Key scripts: `scripts/agent.py` (run agent prompts), `scripts/seed.py`, `scripts/reset.py`, `scripts/reseed.py`
 
 ### Architecture Patterns
-- **Agentic loop**: Claude processes emails one at a time from the CRM inbox, using EspoCRM as its read/write tool via MCP, as part of a work session
-- **Session-based processing**: emails processed in work sessions (e.g. 100 emails per session), drafts prepared during session, "sent" (status change) at end of session
-- **CRM as system of record**: all state lives in EspoCRM — contacts, cases, email drafts, notes, cross-references
-- **Docker Compose stack**: EspoCRM (app + db + daemon) + seed container + agent container
+- **Agentic loop**: Claude processes email threads one at a time from the CRM, using the `crm` CLI via Bash, as part of shift work sessions
+- **Session-based processing**: threads processed in shifts; drafts prepared during session, "sent" (status change) at end of session
+- **CRM as system of record**: all state lives in PostgreSQL via CRM API — contacts, cases, email drafts, notes, threads, cross-references
+- **Docker Compose stack**: PostgreSQL + CRM API + Agent + Frontend
 
 ### Testing Strategy
 - Manual testing and demo-driven validation (hackathon context)
@@ -44,7 +44,7 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 - Property managers referenced by first name in emails (but names don't always match — e.g., "Sarah Brennan" signs as "Tara")
 
 ## Frontend Integration
-A colleague is building a Next.js frontend in `frontend/`. Integration between the frontend and the agent/CRM backend is not yet in scope — current focus is on the email triage automation. Frontend integration will come later.
+Next.js frontend in `frontend/` (port 3000). Proxies CRM API calls via `/api/crm` route. Includes AI assistant chat widget connected to the agent API via SSE streaming.
 
 ## Important Constraints
 - Hackathon time constraint: must be demoable quickly
@@ -54,7 +54,5 @@ A colleague is building a Next.js frontend in `frontend/`. Integration between t
 - Claude account (we could use Claude Max for the development, and will switch to API key later)
 
 ## External Dependencies
-- EspoCRM Docker image (espocrm/espocrm)
-- MariaDB Docker image
-- EspoMCP npm package (github.com/zaphod-black/espomcp)
-- Anthropic Claude API (API key / Claude Max)
+- PostgreSQL Docker image
+- Anthropic Claude API (via AWS Bedrock)
