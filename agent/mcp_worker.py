@@ -1,11 +1,11 @@
 """Worker dispatch — async bridge between Frontend AI and Worker AI.
 
-Provides two tool handler functions for the Frontend AI:
-- delegate_to_worker(prompt) — queue a CRM query, returns task ID immediately
-- get_worker_result(task_id) — poll/wait for the worker's response
+The Frontend AI delegates CRM work here. The worker runs in the background.
+The API layer awaits the result and streams it back to the user.
 
-The worker events (tool_use) are pushed to the active SSE queue so the
-frontend sees CRM tool progress in real time.
+Key functions:
+- delegate(prompt) → task_id (non-blocking, spawns worker in background)
+- await_result(task_id) → worker response text (blocking, used by API layer)
 """
 
 import asyncio
@@ -39,6 +39,10 @@ def set_sse_queue(queue: asyncio.Queue[str | None] | None) -> None:
     """Set/clear the active SSE queue for streaming worker events."""
     global _sse_queue
     _sse_queue = queue
+
+
+def is_busy() -> bool:
+    return _worker_busy
 
 
 # ---------------------------------------------------------------------------
@@ -83,40 +87,36 @@ async def _run_worker(task_id: str, prompt: str, future: asyncio.Future[str]) ->
 
 
 # ---------------------------------------------------------------------------
-# Tool dispatch functions — called by FrontendAI tool handler
+# Public API
 # ---------------------------------------------------------------------------
-async def delegate_to_worker(prompt: str) -> str:
-    """Queue a CRM query for the Worker AI. Returns JSON with task_id."""
+async def delegate(prompt: str) -> str:
+    """Queue a CRM query for the Worker AI. Returns task_id immediately (non-blocking)."""
     task_id = str(uuid.uuid4())[:8]
     log.info("[delegate] task=%s prompt=%s", task_id, prompt[:120])
 
     if _worker_busy:
-        return json.dumps({"error": "Worker is busy with another task. Please wait and retry."})
+        raise RuntimeError("Worker is busy with another task.")
 
     future: asyncio.Future[str] = asyncio.get_event_loop().create_future()
     _tasks[task_id] = future
     asyncio.create_task(_run_worker(task_id, prompt, future))
 
-    return json.dumps({"task_id": task_id, "status": "queued"})
+    return task_id
 
 
-async def get_worker_result(task_id: str) -> str:
-    """Get the result of a delegated task. Returns worker text or status JSON."""
+async def await_result(task_id: str, timeout: float = 120.0) -> str:
+    """Await the worker result for a given task. Blocks until done or timeout."""
     future = _tasks.get(task_id)
-
     if future is None:
-        return json.dumps({"error": f"Unknown task_id: {task_id}"})
-
-    if not future.done():
-        try:
-            await asyncio.wait_for(asyncio.shield(future), timeout=60.0)
-        except asyncio.TimeoutError:
-            return json.dumps({"task_id": task_id, "status": "still_working"})
+        raise ValueError(f"Unknown task_id: {task_id}")
 
     try:
-        result = future.result()
+        result = await asyncio.wait_for(asyncio.shield(future), timeout=timeout)
         del _tasks[task_id]
         return result
-    except Exception as exc:
-        del _tasks[task_id]
-        return json.dumps({"error": str(exc)})
+    except asyncio.TimeoutError:
+        raise TimeoutError(f"Worker task {task_id} timed out after {timeout}s")
+    except Exception:
+        if task_id in _tasks:
+            del _tasks[task_id]
+        raise

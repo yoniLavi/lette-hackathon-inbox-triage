@@ -1,8 +1,11 @@
 """Agent API — two-tier AI architecture with Frontend AI and Worker AI.
 
 Frontend AI: direct Anthropic/Bedrock Messages API, answers from page context
-or delegates CRM work via in-process tool dispatch.
+or delegates CRM work and returns immediately.
 Worker AI: Claude Code SDK session with crm CLI access, domain knowledge, shift skills.
+
+Key design: the Frontend AI NEVER blocks on worker operations. When it delegates,
+the API layer awaits the worker result and streams it back to the user.
 """
 
 import asyncio
@@ -39,31 +42,38 @@ WORKER_OPTIONS = ClaudeCodeOptions(
 )
 
 FRONTEND_SYSTEM_PROMPT = """\
-You are Lette, an AI assistant for BTR/PRS property managers in Ireland.
+You are Lette, a concise AI assistant for property managers in Ireland.
+
+## Tone
+Be conversational and brief. One or two sentences is ideal. Only give long \
+detailed answers when the user explicitly asks for detail (e.g. "list all", \
+"explain", "give me everything"). If the user says "hi" or greets you, respond \
+with a short friendly greeting and mention the single most pressing issue from \
+page context (if available) — nothing more.
 
 ## Rules
-1. **Check page context first.** Each message may include `[Page context: {...}]` \
-with JSON data from the user's screen. If you can answer from this data, respond \
-immediately — no tools needed.
+1. **Check page context first.** Messages may include `[Page context: {...}]`. \
+If you can answer from this context, do so — no tools needed.
 2. **Delegate CRM queries.** For data not in page context, call delegate_to_worker \
-with a clear prompt, then get_worker_result to retrieve the answer.
-3. **Be concise.** Short, helpful answers. Use markdown. Don't narrate tool usage.
-4. **Acknowledge before delegating.** Say something brief like "Let me check that." \
-before calling delegate_to_worker.
+with a clear prompt. After calling the tool, say a brief acknowledgment \
+("Looking into that..." / "Checking the CRM...") and end your turn. The system \
+will deliver the worker's result to the user automatically.
+3. **Never narrate tool usage.** Don't say "I'll use delegate_to_worker". Just \
+acknowledge naturally and delegate.
+4. **Keep it short.** Don't dump all page context data back at the user — they \
+can already see it. Only highlight what's relevant to their question.
 
 ## delegate_to_worker prompts
-Write clear, specific CRM queries. The worker has full CRM access via CLI. Examples:
+Write clear, specific CRM queries. Examples:
 - "List all unread email threads for property Graylings"
 - "Get case 5 with all emails, tasks, and notes"
 - "Search emails for 'water leak' and summarize findings"
-- "Create a task: Schedule plumber for Unit 4B, priority urgent, case 3"
 
 ## Page context formats
-- Dashboard (page: "dashboard"): caseCount, openCaseCount, stats, topCases[]
-- Situation (page: "situation"): caseId, caseName, priority, status, tasks[], \
-draftCount, contactNames[]
-- Properties (page: "properties"): properties[] (name, type, units, manager)
-- Search (page: "search"): query, resultCount, topResults[]
+- Dashboard: caseCount, openCaseCount, stats, topCases[]
+- Situation: caseId, caseName, priority, status, tasks[], draftCount
+- Properties: properties[] (name, type, units, manager)
+- Search: query, resultCount, topResults[]
 """
 
 FRONTEND_MODEL = "eu.anthropic.claude-sonnet-4-20250514-v1:0"
@@ -108,18 +118,9 @@ async def _teardown_worker() -> None:
     _worker_msg_count = 0
 
 
-async def _handle_tool(
-    tool_name: str,
-    tool_input: dict,
-    sse_queue: asyncio.Queue | None,
-) -> str:
-    """In-process tool dispatch for Frontend AI delegation tools."""
-    if tool_name == "delegate_to_worker":
-        return await mcp_worker.delegate_to_worker(tool_input["prompt"])
-    elif tool_name == "get_worker_result":
-        return await mcp_worker.get_worker_result(tool_input["task_id"])
-    else:
-        return json.dumps({"error": f"Unknown tool: {tool_name}"})
+async def _delegate_handler(prompt: str) -> str:
+    """Non-blocking: spawn worker task, return task_id immediately."""
+    return await mcp_worker.delegate(prompt)
 
 
 def _ensure_frontend() -> FrontendAI:
@@ -128,7 +129,7 @@ def _ensure_frontend() -> FrontendAI:
         _frontend_ai = FrontendAI(
             system_prompt=FRONTEND_SYSTEM_PROMPT,
             model=FRONTEND_MODEL,
-            tool_handler=_handle_tool,
+            delegate_handler=_delegate_handler,
         )
         _frontend_session_id = str(uuid.uuid4())
         log.info("[frontend] initialized session=%s", _frontend_session_id)
@@ -192,7 +193,7 @@ def _sse_event(event: str, data: dict) -> str:
 # ---------------------------------------------------------------------------
 @app.post("/prompt")
 async def prompt(req: PromptRequest) -> PromptResponse:
-    """Non-streaming prompt — routes through Frontend AI."""
+    """Non-streaming prompt — routes through Frontend AI, awaits worker if needed."""
     global _busy, _frontend_msg_count
 
     if _busy:
@@ -208,12 +209,24 @@ async def prompt(req: PromptRequest) -> PromptResponse:
         if req.context:
             prompt_text = f"[Page context: {req.context}]\n\n{req.message}"
 
-        response_text = await frontend.chat(prompt_text)
+        mcp_worker.set_sse_queue(None)
+        result = await frontend.chat(prompt_text)
         _frontend_msg_count += 1
-        log.info("[prompt] done in %.1fs", _time.monotonic() - t0)
 
+        final_text = result.text
+
+        # If worker was delegated, await its result
+        if result.pending_task_id:
+            log.info("[prompt] awaiting worker task=%s", result.pending_task_id)
+            worker_text = await mcp_worker.await_result(
+                result.pending_task_id, timeout=_RESPONSE_TIMEOUT
+            )
+            frontend.inject_worker_result(worker_text)
+            final_text = worker_text
+
+        log.info("[prompt] done in %.1fs", _time.monotonic() - t0)
         return PromptResponse(
-            response=response_text,
+            response=final_text,
             session_id=_frontend_session_id or "",
         )
     except HTTPException:
@@ -228,11 +241,13 @@ async def prompt(req: PromptRequest) -> PromptResponse:
 
 @app.post("/prompt/stream")
 async def prompt_stream(req: PromptRequest):
-    """SSE streaming endpoint — two-tier: Frontend AI answers or delegates to Worker.
+    """SSE streaming — Frontend AI responds instantly, worker results stream separately.
 
-    Frontend AI text events stream immediately. Worker tool_use events are pushed
-    to the same queue by the worker dispatch, so the user sees CRM tool progress
-    in real time.
+    Flow:
+    1. Frontend AI answers from context OR delegates and returns acknowledgment (<5s)
+    2. If delegated, worker runs in background — tool_use events stream in real time
+    3. Worker result streams as final text event
+    4. Done event with complete response
     """
     global _busy
 
@@ -258,20 +273,45 @@ async def prompt_stream(req: PromptRequest):
             if req.context:
                 prompt_text = f"[Page context: {req.context}]\n\n{req.message}"
 
-            response_text = await asyncio.wait_for(
+            # Phase 1: Frontend AI responds instantly
+            result = await asyncio.wait_for(
                 frontend.chat(prompt_text, sse_queue=queue),
                 timeout=_RESPONSE_TIMEOUT,
             )
-
             _frontend_msg_count += 1
-            await queue.put(
-                _sse_event("done", {"response": response_text})
-            )
+
+            # Phase 2: If worker was delegated, await its result
+            if result.pending_task_id:
+                log.info("[stream] awaiting worker task=%s", result.pending_task_id)
+                try:
+                    worker_text = await asyncio.wait_for(
+                        mcp_worker.await_result(result.pending_task_id),
+                        timeout=_RESPONSE_TIMEOUT,
+                    )
+                    # Stream worker result as a text event
+                    await queue.put(_sse_event("text", {"text": worker_text}))
+                    # Inject into conversation history for follow-ups
+                    frontend.inject_worker_result(worker_text)
+                    # Done with worker result as the final response
+                    await queue.put(
+                        _sse_event("done", {"response": worker_text})
+                    )
+                except (TimeoutError, Exception) as exc:
+                    log.error("[stream] worker error: %s", exc)
+                    await queue.put(
+                        _sse_event("error", {"detail": f"Worker failed: {exc}"})
+                    )
+            else:
+                # No delegation — done with frontend's response
+                await queue.put(
+                    _sse_event("done", {"response": result.text})
+                )
+
         except TimeoutError:
             log.error("[stream] timeout — no response within %ds", _RESPONSE_TIMEOUT)
             _teardown_frontend()
             await queue.put(
-                _sse_event("error", {"detail": f"Response timed out after {_RESPONSE_TIMEOUT}s. Please try again."})
+                _sse_event("error", {"detail": f"Response timed out after {_RESPONSE_TIMEOUT}s."})
             )
         except Exception as exc:
             log.error("[stream] error: %s", exc)
