@@ -10,6 +10,8 @@ import logging
 import os
 from typing import Any, Awaitable, Callable
 
+from anthropic import AnthropicBedrock
+
 log = logging.getLogger("agent.frontend")
 
 # ---------------------------------------------------------------------------
@@ -65,6 +67,39 @@ def _sse_event(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
+def _create_client():
+    """Create Anthropic Bedrock client for the Frontend AI.
+
+    Supports two auth modes:
+    - ABSK bearer token (Claude Code format): passed as Authorization header,
+      SigV4 auth skipped (matches Claude Code CLI behavior)
+    - Standard IAM credentials: uses AnthropicBedrock with SigV4
+    """
+    region = os.environ.get("AWS_REGION", "eu-west-1")
+    bearer_token = os.environ.get("AWS_BEARER_TOKEN_BEDROCK", "")
+
+    if bearer_token:
+        # Bearer token auth — skip SigV4, pass token in Authorization header
+        # This matches how Claude Code CLI handles AWS_BEARER_TOKEN_BEDROCK
+        log.info("Creating AnthropicBedrock client (bearer token, region=%s)", region)
+        return _BearerTokenBedrock(
+            aws_region=region,
+            default_headers={"Authorization": f"Bearer {bearer_token}"},
+        )
+    else:
+        # Standard IAM credentials — use AnthropicBedrock with SigV4
+        log.info("Creating AnthropicBedrock client (IAM credentials, region=%s)", region)
+        return AnthropicBedrock(aws_region=region)
+
+
+class _BearerTokenBedrock(AnthropicBedrock):
+    """AnthropicBedrock subclass that skips SigV4 auth for bearer token mode."""
+
+    def _prepare_request(self, request) -> None:
+        # Skip SigV4 signing — bearer token is already in default headers
+        pass
+
+
 class FrontendAI:
     """Direct Messages API client for the user-facing AI layer."""
 
@@ -76,12 +111,7 @@ class FrontendAI:
         tool_handler: ToolHandler,
         max_turns: int = 10,
     ):
-        from anthropic import AnthropicBedrock
-
-        self.client = AnthropicBedrock(
-            aws_bearer_token=os.environ["AWS_BEARER_TOKEN_BEDROCK"],
-            aws_region=os.environ.get("AWS_REGION", "eu-west-1"),
-        )
+        self.client = _create_client()
         self.system_prompt = system_prompt
         self.model = model
         self.tool_handler = tool_handler
