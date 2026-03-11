@@ -5,7 +5,8 @@ or delegates CRM work and returns immediately.
 Worker AI: Claude Code SDK session with crm CLI access, domain knowledge, shift skills.
 
 Key design: the Frontend AI NEVER blocks on worker operations. When it delegates,
-the API layer awaits the worker result and streams it back to the user.
+the worker runs in the background and results are delivered via /worker/status polling.
+The user can continue chatting with the Frontend AI while the worker runs.
 """
 
 import asyncio
@@ -95,6 +96,10 @@ _frontend_msg_count: int = 0
 
 _busy: bool = False
 
+# Background worker tracking — results delivered via /worker/status polling
+_pending_worker_task_id: str | None = None
+_pending_worker_result: dict | None = None  # {"task_id": str, "text": str}
+
 
 async def _ensure_worker() -> ClaudeSDKClient:
     global _worker_client, _worker_session_id
@@ -149,6 +154,25 @@ def _teardown_frontend() -> None:
 mcp_worker.configure(ensure_worker=_ensure_worker)
 
 
+async def _background_worker_complete(task_id: str) -> None:
+    """Background task: await worker result, store for polling, inject into frontend history."""
+    global _pending_worker_result, _pending_worker_task_id
+    try:
+        worker_text = await mcp_worker.await_result(task_id, timeout=_RESPONSE_TIMEOUT)
+        _pending_worker_result = {"task_id": task_id, "text": worker_text}
+        if _frontend_ai is not None:
+            _frontend_ai.inject_worker_result(worker_text)
+        log.info("[worker-bg] result ready task=%s (%d chars)", task_id, len(worker_text))
+    except Exception as exc:
+        log.error("[worker-bg] error task=%s: %s", task_id, exc)
+        error_text = f"Sorry, the CRM lookup failed: {exc}"
+        _pending_worker_result = {"task_id": task_id, "text": error_text}
+        if _frontend_ai is not None:
+            _frontend_ai.inject_worker_result(f"[Worker error: {exc}]")
+    finally:
+        _pending_worker_task_id = None
+
+
 # ---------------------------------------------------------------------------
 # App lifecycle
 # ---------------------------------------------------------------------------
@@ -179,6 +203,7 @@ class PromptRequest(BaseModel):
 class PromptResponse(BaseModel):
     response: str
     session_id: str
+    worker_task_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -193,8 +218,12 @@ def _sse_event(event: str, data: dict) -> str:
 # ---------------------------------------------------------------------------
 @app.post("/prompt")
 async def prompt(req: PromptRequest) -> PromptResponse:
-    """Non-streaming prompt — routes through Frontend AI, awaits worker if needed."""
-    global _busy, _frontend_msg_count
+    """Non-streaming prompt — routes through Frontend AI, returns immediately.
+
+    If the Frontend AI delegates to the worker, the acknowledgment is returned
+    with worker_task_id. The client polls /worker/status for the worker result.
+    """
+    global _busy, _frontend_msg_count, _pending_worker_task_id
 
     if _busy:
         raise HTTPException(status_code=409, detail="Agent is busy with another request.")
@@ -213,21 +242,17 @@ async def prompt(req: PromptRequest) -> PromptResponse:
         result = await frontend.chat(prompt_text)
         _frontend_msg_count += 1
 
-        final_text = result.text
-
-        # If worker was delegated, await its result
+        # If worker was delegated, start background task — don't block
         if result.pending_task_id:
-            log.info("[prompt] awaiting worker task=%s", result.pending_task_id)
-            worker_text = await mcp_worker.await_result(
-                result.pending_task_id, timeout=_RESPONSE_TIMEOUT
-            )
-            frontend.inject_worker_result(worker_text)
-            final_text = worker_text
+            _pending_worker_task_id = result.pending_task_id
+            asyncio.create_task(_background_worker_complete(result.pending_task_id))
+            log.info("[prompt] delegated to worker task=%s, returning acknowledgment", result.pending_task_id)
 
         log.info("[prompt] done in %.1fs", _time.monotonic() - t0)
         return PromptResponse(
-            response=final_text,
+            response=result.text,
             session_id=_frontend_session_id or "",
+            worker_task_id=result.pending_task_id,
         )
     except HTTPException:
         raise
@@ -241,13 +266,12 @@ async def prompt(req: PromptRequest) -> PromptResponse:
 
 @app.post("/prompt/stream")
 async def prompt_stream(req: PromptRequest):
-    """SSE streaming — Frontend AI responds instantly, worker results stream separately.
+    """SSE streaming — Frontend AI responds instantly, stream closes immediately.
 
     Flow:
     1. Frontend AI answers from context OR delegates and returns acknowledgment (<5s)
-    2. If delegated, worker runs in background — tool_use events stream in real time
-    3. Worker result streams as final text event
-    4. Done event with complete response
+    2. Done event closes the stream — input re-enables immediately
+    3. If delegated, worker runs in background — client polls /worker/status
     """
     global _busy
 
@@ -259,10 +283,9 @@ async def prompt_stream(req: PromptRequest):
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     async def _consume():
-        global _frontend_msg_count
+        global _frontend_msg_count, _pending_worker_task_id
         try:
-            # Wire up worker events to this stream's queue
-            mcp_worker.set_sse_queue(queue)
+            mcp_worker.set_sse_queue(None)  # No SSE queue — worker events via polling
 
             frontend = _ensure_frontend()
             log.info("[stream] frontend ready, session=%s msg_count=%d",
@@ -273,34 +296,24 @@ async def prompt_stream(req: PromptRequest):
             if req.context:
                 prompt_text = f"[Page context: {req.context}]\n\n{req.message}"
 
-            # Phase 1: Frontend AI responds instantly
+            # Frontend AI responds — fast path (<5s)
             result = await asyncio.wait_for(
                 frontend.chat(prompt_text, sse_queue=queue),
                 timeout=_RESPONSE_TIMEOUT,
             )
             _frontend_msg_count += 1
 
-            # Phase 2: If worker was delegated, await its result
             if result.pending_task_id:
-                log.info("[stream] awaiting worker task=%s", result.pending_task_id)
-                try:
-                    worker_text = await asyncio.wait_for(
-                        mcp_worker.await_result(result.pending_task_id),
-                        timeout=_RESPONSE_TIMEOUT,
-                    )
-                    # Stream worker result as a text event
-                    await queue.put(_sse_event("text", {"text": worker_text}))
-                    # Inject into conversation history for follow-ups
-                    frontend.inject_worker_result(worker_text)
-                    # Done with worker result as the final response
-                    await queue.put(
-                        _sse_event("done", {"response": worker_text})
-                    )
-                except (TimeoutError, Exception) as exc:
-                    log.error("[stream] worker error: %s", exc)
-                    await queue.put(
-                        _sse_event("error", {"detail": f"Worker failed: {exc}"})
-                    )
+                # Delegation happened — close stream immediately, worker runs in background
+                _pending_worker_task_id = result.pending_task_id
+                await queue.put(
+                    _sse_event("done", {
+                        "response": result.text,
+                        "worker_task_id": result.pending_task_id,
+                    })
+                )
+                asyncio.create_task(_background_worker_complete(result.pending_task_id))
+                log.info("[stream] delegated task=%s, closing stream", result.pending_task_id)
             else:
                 # No delegation — done with frontend's response
                 await queue.put(
@@ -318,7 +331,6 @@ async def prompt_stream(req: PromptRequest):
             _teardown_frontend()
             await queue.put(_sse_event("error", {"detail": str(exc)}))
         finally:
-            mcp_worker.set_sse_queue(None)
             await queue.put(None)  # sentinel
 
     async def generate():
@@ -411,10 +423,31 @@ async def shift():
         _busy = False
 
 
+@app.get("/worker/status")
+async def worker_status():
+    """Poll for background worker results. Returns result once, then clears it."""
+    global _pending_worker_result
+    result = _pending_worker_result
+    if result:
+        _pending_worker_result = None  # consume once
+        return {
+            "busy": False,
+            "result": result["text"],
+            "task_id": result["task_id"],
+        }
+    return {
+        "busy": _pending_worker_task_id is not None or mcp_worker.is_busy(),
+        "result": None,
+        "task_id": _pending_worker_task_id,
+    }
+
+
 @app.post("/session/restart")
 async def restart_session():
-    global _busy
+    global _busy, _pending_worker_result, _pending_worker_task_id
     _busy = False
+    _pending_worker_result = None
+    _pending_worker_task_id = None
     _teardown_frontend()
     await _teardown_worker()
     return {"status": "restarted"}

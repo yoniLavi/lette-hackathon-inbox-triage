@@ -21,16 +21,12 @@ The frontend SHALL include a floating chat widget that sends messages to the age
 - **THEN** the AI answers from the provided page context without making CRM tool calls
 - **AND** the response arrives within 3 seconds
 
-#### Scenario: Live tool updates
-- **WHEN** the agent uses tools during processing
-- **THEN** the widget displays the tool name in the status indicator as each `tool_use` SSE event arrives
-- **AND** updates are visible within seconds of the tool being invoked
-
-#### Scenario: Two-phase response
+#### Scenario: Non-blocking CRM delegation
 - **WHEN** the Frontend AI delegates CRM work to the Worker
-- **THEN** the widget first shows the Frontend AI's immediate acknowledgment
-- **AND** then updates with the Worker's CRM results when they arrive
-- **AND** the user sees continuous progress throughout (never a blank loading state after the acknowledgment)
+- **THEN** the widget shows the Frontend AI's acknowledgment and re-enables the input immediately
+- **AND** shows a "Searching CRM..." indicator while the worker runs in the background
+- **AND** the user can send new messages to the Frontend AI during this time
+- **AND** the Worker's result appears as a new assistant message when it arrives (via polling `GET /worker/status`)
 
 #### Scenario: Network error
 - **WHEN** the agent API is unreachable or returns a server error

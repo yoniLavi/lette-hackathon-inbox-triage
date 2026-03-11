@@ -52,6 +52,7 @@ export function AIAssistant() {
     const [inputValue, setInputValue] = useState("");
     const [loading, setLoading] = useState(false);
     const [streamingText, setStreamingText] = useState("");
+    const [workerTaskId, setWorkerTaskId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -69,6 +70,27 @@ export function AIAssistant() {
 
     const [statusText, setStatusText] = useState("");
 
+    // Poll for background worker results
+    useEffect(() => {
+        if (!workerTaskId) return;
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`${AGENT_URL}/worker/status`);
+                const data = await res.json();
+                if (data.result) {
+                    setMessages(prev => [...prev, {
+                        id: Date.now().toString(),
+                        role: "assistant" as const,
+                        content: data.result,
+                        timestamp: new Date(),
+                    }]);
+                    setWorkerTaskId(null);
+                }
+            } catch { /* ignore */ }
+        }, 2000);
+        return () => clearInterval(interval);
+    }, [workerTaskId]);
+
     const friendlyTool = (name: string) => {
         if (name.includes("crm") || name.includes("Bash")) {
             const action = name.split("__").pop() || name;
@@ -77,7 +99,7 @@ export function AIAssistant() {
         return name.replace(/_/g, " ");
     };
 
-    const processStream = async (url: string, body: string): Promise<string> => {
+    const processStream = async (url: string, body: string): Promise<{ response: string; workerTaskId?: string }> => {
         console.log("[chat] fetch processStream called, url:", url);
         setStatusText("Connecting...");
         setStreamingText("");
@@ -106,6 +128,7 @@ export function AIAssistant() {
         let currentEvent = "";
         let finalResponse = "";
         let liveText = "";
+        let returnedWorkerTaskId: string | undefined;
 
         console.log("[chat] starting stream read loop");
 
@@ -137,18 +160,17 @@ export function AIAssistant() {
                             setStatusText(label);
                         } else if (currentEvent === "tool_use") {
                             setStatusText(friendlyTool(data.tool));
-                            // Keep fast AI text visible while tools run — don't clear
                         } else if (currentEvent === "progress") {
                             setStatusText(data.text || "Working...");
                         } else if (currentEvent === "text") {
-                            // Each text event replaces the displayed text.
-                            // Fast AI sends the first text (acknowledgment or full answer).
-                            // Worker sends later text (CRM results) which replaces it.
                             liveText = data.text;
                             setStreamingText(liveText);
                             setStatusText("");
                         } else if (currentEvent === "done") {
                             finalResponse = data.response;
+                            if (data.worker_task_id) {
+                                returnedWorkerTaskId = data.worker_task_id;
+                            }
                         } else if (currentEvent === "error") {
                             throw new Error(data.detail);
                         }
@@ -160,7 +182,10 @@ export function AIAssistant() {
             }
         }
 
-        return finalResponse || liveText || "(no response)";
+        return {
+            response: finalResponse || liveText || "(no response)",
+            workerTaskId: returnedWorkerTaskId,
+        };
     };
 
     const handleNewChat = async () => {
@@ -168,6 +193,7 @@ export function AIAssistant() {
         setLoading(false);
         setStatusText("");
         setStreamingText("");
+        setWorkerTaskId(null);
         try {
             await fetch(`${AGENT_URL}/session/restart`, { method: "POST" });
         } catch { /* ignore */ }
@@ -192,7 +218,7 @@ export function AIAssistant() {
         try {
             const context = serializePageContext(pageData);
             const body = JSON.stringify({ message: text, context: context || undefined });
-            const response = await processStream(`${AGENT_URL}/prompt/stream`, body);
+            const { response, workerTaskId: wid } = await processStream(`${AGENT_URL}/prompt/stream`, body);
 
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
@@ -200,6 +226,11 @@ export function AIAssistant() {
                 content: response,
                 timestamp: new Date()
             }]);
+
+            // If worker was delegated, start polling for results
+            if (wid) {
+                setWorkerTaskId(wid);
+            }
         } catch (err) {
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
@@ -233,9 +264,9 @@ export function AIAssistant() {
                                 <div>
                                     <h3 className="font-sans font-bold text-[16px]">Lette Assistant</h3>
                                     <div className="flex items-center gap-1.5">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${loading ? "bg-amber-400" : "bg-emerald-400"} animate-pulse`} />
+                                        <div className={`w-1.5 h-1.5 rounded-full ${loading || workerTaskId ? "bg-amber-400" : "bg-emerald-400"} animate-pulse`} />
                                         <span className="text-[11px] text-white/60 uppercase tracking-widest font-bold">
-                                            {loading ? (statusText || "Thinking...") : "Online"}
+                                            {loading ? (statusText || "Thinking...") : workerTaskId ? "Searching CRM..." : "Online"}
                                         </span>
                                     </div>
                                 </div>
@@ -301,6 +332,15 @@ export function AIAssistant() {
                                     <div className="bg-slate-50 border border-slate-100 rounded-[24px] rounded-tl-none p-4 flex items-center gap-2">
                                         <Loader2 className="w-5 h-5 text-[#0000EE] animate-spin shrink-0" />
                                         {statusText && <span className="text-xs text-[#0F1016]/50 font-sans">{statusText}</span>}
+                                    </div>
+                                </div>
+                            )}
+                            {/* Worker running in background — user can still chat */}
+                            {workerTaskId && !loading && (
+                                <div className="flex justify-start" data-testid="worker-indicator">
+                                    <div className="bg-slate-50 border border-slate-100 rounded-full px-4 py-2 flex items-center gap-2">
+                                        <Loader2 className="w-3.5 h-3.5 text-[#0000EE] animate-spin shrink-0" />
+                                        <span className="text-[11px] text-[#0F1016]/40 font-sans font-medium">Searching CRM...</span>
                                     </div>
                                 </div>
                             )}

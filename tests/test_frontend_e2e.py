@@ -219,22 +219,58 @@ def test_input_disabled_during_loading(page: Page):
     expect(enabled_input).to_be_enabled(timeout=3000)
 
 
-def test_crm_delegation_shows_tool_progress(page: Page):
-    """CRM delegation shows tool use status while worker processes."""
+def test_non_blocking_delegation(page: Page):
+    """Full non-blocking flow: delegate → chat during worker → receive worker result.
+
+    This is the key regression test for the non-blocking delegation UX:
+    1. Send a CRM query that triggers worker delegation
+    2. Get acknowledgment quickly, input re-enables
+    3. Send a follow-up question while worker runs — get an instant response
+    4. Worker result arrives as a new message after some time
+    """
     open_chat(page)
+
+    # Step 1: Send a query that requires CRM delegation
     send_message(page, "Search the CRM for emails about fire safety")
 
-    # During worker delegation, we should see tool_use status text
-    # The status appears as small text below the streaming response
-    # Wait for either tool progress or the final response
-    page.wait_for_selector(
-        "text=/Using tool|Searching|fire|safety|CRM|checking/i",
+    # Step 2: Acknowledgment arrives quickly, input re-enables
+    ack = wait_for_response(page, timeout=FAST_TIMEOUT)
+    assert len(ack) > 5, f"Acknowledgment too short: {ack}"
+
+    chat_input = page.locator("input[placeholder*='Ask anything']")
+    expect(chat_input).to_be_enabled(timeout=5000)
+
+    # Worker progress indicator should be visible while worker runs
+    worker_indicator = page.locator("[data-testid='worker-indicator']")
+    try:
+        expect(worker_indicator).to_be_visible(timeout=5000)
+    except Exception:
+        pass  # Worker may have already finished
+
+    # Step 3: Send a follow-up while worker is still running
+    send_message(page, "What is your name?")
+    followup = wait_for_response(page, timeout=FAST_TIMEOUT)
+    assert any(
+        kw in followup.lower() for kw in ["lette", "assistant", "ai", "help"]
+    ), f"Follow-up response doesn't seem right: {followup[:200]}"
+
+    # Step 4: Wait for the worker result to appear as a NEW assistant message
+    # The worker result is delivered via polling and added as a new bubble
+    assistant_msgs = page.locator("div.justify-start div.rounded-\\[24px\\]")
+    msgs_after_followup = assistant_msgs.count()
+
+    # Wait for message count to increase (worker result arrives as new message)
+    page.wait_for_function(
+        f"document.querySelectorAll('div.justify-start div[class*=\"rounded-[24px]\"]').length > {msgs_after_followup}",
         timeout=SLOW_TIMEOUT,
     )
 
-    # Wait for the full response
-    response = wait_for_response(page, timeout=SLOW_TIMEOUT)
-    assert len(response) > 50, f"CRM delegation response too short: {response[:200]}"
+    # The new message should contain actual CRM data (not just acknowledgment)
+    final_count = assistant_msgs.count()
+    last_msg = assistant_msgs.nth(final_count - 1).inner_text()
+    assert len(last_msg) > 100, (
+        f"Worker result message too short ({len(last_msg)} chars): {last_msg[:200]}"
+    )
 
 
 def test_response_renders_markdown(page: Page):

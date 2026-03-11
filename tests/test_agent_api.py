@@ -69,10 +69,23 @@ def test_prompt_works_after_restart(api):
     assert "4" in r.json()["response"]
 
 
-def test_crm_query_returns_data(api):
+def test_crm_delegation_and_polling(api):
+    """CRM query triggers delegation — returns acknowledgment with worker_task_id, then poll for result."""
     r = api.post(
         "/prompt",
-        json={"message": "Use the crm CLI to count how many Email records exist. Run: crm emails list --limit 1. Return ONLY the total number."},
+        json={"message": "Search the CRM for emails about fire safety"},
     )
     assert r.status_code == 200
-    assert len(r.json()["response"]) > 0
+    data = r.json()
+    assert len(data["response"]) > 0, "Should return an acknowledgment"
+    assert data["worker_task_id"] is not None, "Should have delegated to worker"
+
+    # Poll /worker/status until result arrives
+    import time
+    for _ in range(40):
+        time.sleep(3)
+        status = api.get("/worker/status").json()
+        if status["result"]:
+            assert len(status["result"]) > 50, f"Worker result too short: {status['result'][:100]}"
+            return
+    pytest.fail("Worker result never arrived within 120s")

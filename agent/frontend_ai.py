@@ -178,17 +178,26 @@ class FrontendAI:
             tool_results = []
             for tu in tool_uses:
                 if tu.name == "delegate_to_worker":
-                    task_id = await self.delegate_handler(tu.input["prompt"])
-                    pending_task_id = task_id
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": tu.id,
-                        "content": json.dumps({
-                            "task_id": task_id,
-                            "status": "queued",
-                            "note": "Worker is running. End your turn now — the system will deliver results to the user.",
-                        }),
-                    })
+                    try:
+                        task_id = await self.delegate_handler(tu.input["prompt"])
+                        pending_task_id = task_id
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tu.id,
+                            "content": json.dumps({
+                                "task_id": task_id,
+                                "status": "queued",
+                                "note": "Worker is running. End your turn now — the system will deliver results to the user.",
+                            }),
+                        })
+                    except Exception as e:
+                        log.warning("[chat] delegate failed: %s", e)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tu.id,
+                            "content": json.dumps({"error": str(e)}),
+                            "is_error": True,
+                        })
                 else:
                     tool_results.append({
                         "type": "tool_result",

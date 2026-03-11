@@ -21,7 +21,7 @@
 - [x] 4.2 Frontend AI system prompt: page context rules, delegation instructions, never-block contract
 - [x] 4.3 Wire up Frontend AI session lifecycle (_ensure_frontend, _teardown_frontend)
 
-## 5. Two-tier streaming endpoint
+## 5. Two-tier streaming endpoint (v1 — worker streamed in same SSE; replaced by non-blocking in section 11)
 - [x] 5.1 Rewrite `POST /prompt/stream` — route all user messages through Frontend AI
 - [x] 5.2 Stream Frontend AI text events (acknowledgments, context-based answers) immediately
 - [x] 5.3 Stream Worker progress (tool_use events) via shared SSE queue as they arrive
@@ -33,7 +33,7 @@
 - [x] 6.3 Keep `POST /shift` endpoint unchanged (uses Worker directly)
 - [x] 6.4 Update Dockerfile and docker-compose.yml for mcp_worker.py
 
-## 7. Frontend adjustments
+## 7. Frontend adjustments (v1 — two-phase SSE; replaced by polling in section 11)
 - [x] 7.1 Verify AIAssistant SSE handling supports two-phase response pattern
 - [x] 7.2 Verify streaming UX: acknowledgment visible, tool progress, then CRM results replace
 
@@ -48,13 +48,12 @@
   - AnthropicBedrock client with aws_bearer_token + aws_region from env
   - In-process conversation history (list of messages)
   - System prompt (reuse existing FRONTEND_SYSTEM_PROMPT)
-  - Two tool definitions: delegate_to_worker, get_worker_result (JSON schema)
+  - Tool definition: delegate_to_worker (fire-and-forget, no get_worker_result)
   - Non-streaming messages.create() via asyncio.to_thread (avoids blocking event loop)
   - Tool execution loop: when model returns tool_use, execute in-process, send tool_result, continue
 - [x] 9.3 Implement in-process tool dispatch (replaces MCP server for frontend)
   - delegate_to_worker: reuse existing _run_worker logic from mcp_worker.py
-  - get_worker_result: reuse existing future-based polling logic
-  - Worker tool_use events still pushed to SSE queue
+  - Worker tool_use events pushed to SSE queue (v1; replaced by polling in v3)
 - [x] 9.4 Update api.py: replace ClaudeSDKClient frontend with frontend_ai module
   - _ensure_frontend / _teardown_frontend now manage FrontendAI instance + message history
   - /prompt/stream _consume() calls frontend_ai.chat() instead of SDK
@@ -71,3 +70,18 @@
 - [x] 10.5 Playwright E2E tests (12/12): dashboard, chat open/close, send/receive, multi-turn,
   context-aware, streaming loading state, input disabled, CRM delegation tool progress,
   markdown rendering, page navigation persistence
+
+## 11. Non-blocking delegation UX (v3 — user can chat during worker execution)
+- [x] 11.1 Backend: SSE stream closes immediately after Frontend AI acknowledgment
+- [x] 11.2 Backend: Worker runs in background via `_background_worker_complete()`, results stored for polling
+- [x] 11.3 Backend: Add `GET /worker/status` polling endpoint (returns result once, then clears)
+- [x] 11.4 Backend: `/prompt` and `/prompt/stream` return `worker_task_id` in response
+- [x] 11.5 Backend: Frontend AI available for new messages while worker runs (concurrent chat)
+- [x] 11.6 Backend: Graceful error handling when delegate fails (worker busy → tool_result error)
+- [x] 11.7 Frontend: Input re-enables immediately after acknowledgment (stream closes on `done`)
+- [x] 11.8 Frontend: Poll `/worker/status` every 2s when `workerTaskId` is set
+- [x] 11.9 Frontend: Worker result appears as new assistant message via polling
+- [x] 11.10 Frontend: "Searching CRM..." indicator (header status + chat bubble) while worker runs
+- [x] 11.11 Validated: delegation returns in 5.4s, follow-up chat in 2.1s, worker result in ~20s
+- [x] 11.12 Integration tests: 24/24 passed
+- [x] 11.13 Updated Playwright E2E: non-blocking delegation test replaces old blocking test

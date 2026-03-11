@@ -11,7 +11,7 @@ The core principle: **the user-facing AI should never perform blocking operation
 
 Two AI sessions with fundamentally different runtime characteristics:
 
-1. **Frontend AI** (user-facing) — calls the Anthropic/Bedrock Messages API directly via `anthropic` Python SDK. No Claude Code CLI overhead. Has two tool definitions (`delegate_to_worker`, `get_worker_result`) for async CRM delegation. Converses with the user, has rich page context, and is smart (Sonnet). Maintains its own conversation history in-process. **Target: context-only responses in < 3s.**
+1. **Frontend AI** (user-facing) — calls the Anthropic/Bedrock Messages API directly via `anthropic` Python SDK. No Claude Code CLI overhead. Has one tool (`delegate_to_worker`) for fire-and-forget CRM delegation. Converses with the user, has rich page context, and is smart (Sonnet). Maintains its own conversation history in-process. **Target: context-only responses in < 3s.** After delegating, the Frontend AI remains available for follow-up questions while the worker runs.
 
 2. **Worker AI** (CRM agent) — the existing Claude Code SDK session with `crm` CLI access, CLAUDE.md domain knowledge, and shift skills. Unchanged from current implementation. Receives plain-text prompts from the Frontend AI via the delegation tools.
 
@@ -24,13 +24,12 @@ The Claude Code SDK wraps a CLI subprocess — each `query()` + `receive_respons
 
 This added ~5-8s to every Frontend AI response, even when no tools were used. Since the Frontend AI only needs two custom tools (no Bash, no file access), calling the Messages API directly eliminates all of this overhead. Measured fast-path times with SDK were 3.7-8.2s; direct API should be < 3s.
 
-### Delegation tools
+### Delegation tool
 
-Two tool definitions in the Frontend AI's Messages API call:
+One tool definition in the Frontend AI's Messages API call:
 - `delegate_to_worker(prompt)` — handled in-process, queues a prompt for the Worker AI, returns a task ID immediately (non-blocking)
-- `get_worker_result(task_id)` — handled in-process, returns the response text when done, or a "still working" status
 
-The Frontend AI calls `delegate_to_worker`, gets the task ID back instantly, can acknowledge the user, then calls `get_worker_result` to retrieve the CRM data when ready. From the user's perspective: immediate acknowledgment → tool progress → CRM results, all in one streaming turn.
+The Frontend AI calls `delegate_to_worker`, gets the task ID back, writes a brief acknowledgment, and **ends its turn immediately**. The SSE stream closes. The worker runs in the background. The user can continue chatting with the Frontend AI. The worker result is delivered via a separate polling endpoint (`GET /worker/status`) and appears as a new assistant message in the UI.
 
 ### Page context enrichment
 
@@ -54,9 +53,10 @@ The chat widget passes structured JSON page context (actual on-screen data — c
 - Claude Code SDK adds ~5-8s overhead per query even with `effort=low` — CLI subprocess is the bottleneck
 - The streaming SSE infrastructure (asyncio.Queue bridge) works well for both direct API and SDK paths
 - Page context enrichment delivers huge value — most "what's on my screen" questions need no CRM access
-- `anthropic` Python SDK with Bedrock auth: `AnthropicBedrock(aws_bearer_token=..., aws_region=...)`
+- Bedrock ABSK auth: pass `AWS_BEARER_TOKEN_BEDROCK` as `Authorization: Bearer` header, skip SigV4 via `_BearerTokenBedrock` subclass
 - Bedrock model ID: `eu.anthropic.claude-sonnet-4-20250514-v1:0`
-- In-process MCP server approach (via SDK) was correct for initial implementation but is now replaced by direct tool handling for the Frontend AI; the Worker still uses ClaudeSDKClient
+- **Non-blocking delegation is critical**: the original `get_worker_result` tool blocked the Frontend AI for 30-60s. Removed it entirely — the API layer manages worker lifecycle independently. The Frontend AI only has `delegate_to_worker` (fire-and-forget). Worker results delivered via polling endpoint.
+- **UI must not block**: even with a non-blocking backend, the SSE stream staying open caused the frontend to disable input. Solution: close the stream immediately after acknowledgment, deliver worker results via `/worker/status` polling.
 
 ## Impact
 - Affected specs: `agent-api` (direct API for frontend, SDK for worker, tool handling, SSE streaming), `frontend-app` (page context enrichment, streaming UX)
