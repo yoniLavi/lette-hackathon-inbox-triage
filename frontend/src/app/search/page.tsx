@@ -23,11 +23,7 @@ export default function SearchPage() {
         try {
             const emails = await searchEmails(q.trim());
             setResults(emails);
-            setData(buildSearchContext(q.trim(), emails.map(e => ({
-                subject: e.subject,
-                sender: senderDisplay(e),
-                dateSent: e.date_sent,
-            }))));
+            setData(buildSearchContext(q.trim(), emails));
         } catch {
             setResults([]);
         } finally {

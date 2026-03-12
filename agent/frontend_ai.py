@@ -11,7 +11,7 @@ import asyncio
 import json
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
 from anthropic import AnthropicBedrock
@@ -21,7 +21,7 @@ log = logging.getLogger("agent.frontend")
 # ---------------------------------------------------------------------------
 # Tool definitions for the Messages API — only delegate, no blocking get
 # ---------------------------------------------------------------------------
-DELEGATION_TOOLS = [
+TOOLS = [
     {
         "name": "delegate_to_worker",
         "description": (
@@ -41,6 +41,41 @@ DELEGATION_TOOLS = [
             "required": ["prompt"],
         },
     },
+    {
+        "name": "page_action",
+        "description": (
+            "Trigger a UI action on the user's page. Use this to draw the user's "
+            "attention to a specific element. Call at most once per turn. "
+            "Do NOT combine with delegate_to_worker in the same turn."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["scrollTo", "expand"],
+                    "description": "scrollTo: scroll to and highlight an element. expand: expand a collapsed thread.",
+                },
+                "target": {
+                    "type": "object",
+                    "description": "The element to target.",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": ["email", "thread", "task", "draft", "note"],
+                            "description": "The type of element.",
+                        },
+                        "id": {
+                            "type": "string",
+                            "description": "The element ID (e.g. email id, thread_id, task id).",
+                        },
+                    },
+                    "required": ["type", "id"],
+                },
+            },
+            "required": ["action", "target"],
+        },
+    },
 ]
 
 # Type for the delegate handler: (prompt) -> task_id
@@ -52,10 +87,18 @@ def _sse_event(event: str, data: dict) -> str:
 
 
 @dataclass
+class PageAction:
+    """A UI action for the frontend to execute."""
+    action: str  # "scrollTo" | "expand"
+    target: dict  # {"type": "email"|"thread"|..., "id": "..."}
+
+
+@dataclass
 class ChatResult:
     """Result from a Frontend AI chat turn."""
     text: str
     pending_task_id: str | None = None
+    page_action: PageAction | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +171,7 @@ class FrontendAI:
         self.messages.append({"role": "user", "content": user_message})
 
         pending_task_id: str | None = None
+        page_action: PageAction | None = None
         final_text = "(no response)"
 
         for turn in range(self.max_turns):
@@ -139,7 +183,7 @@ class FrontendAI:
                 max_tokens=4096,
                 system=self.system_prompt,
                 messages=self.messages,
-                tools=DELEGATION_TOOLS,
+                tools=TOOLS,
             )
 
             log.info(
@@ -174,7 +218,7 @@ class FrontendAI:
                 final_text = "\n\n".join(text_parts) or "(no response)"
                 break
 
-            # Execute delegate_to_worker — non-blocking, returns task_id
+            # Execute tools
             tool_results = []
             for tu in tool_uses:
                 if tu.name == "delegate_to_worker":
@@ -198,6 +242,25 @@ class FrontendAI:
                             "content": json.dumps({"error": str(e)}),
                             "is_error": True,
                         })
+                elif tu.name == "page_action":
+                    # Don't execute server-side — pass through to frontend via SSE
+                    page_action = PageAction(
+                        action=tu.input["action"],
+                        target=tu.input["target"],
+                    )
+                    log.info("[chat] page_action: %s %s", page_action.action, page_action.target)
+                    if sse_queue:
+                        await sse_queue.put(
+                            _sse_event("action", {
+                                "action": page_action.action,
+                                "target": page_action.target,
+                            })
+                        )
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tu.id,
+                        "content": json.dumps({"status": "executed", "note": "Action sent to the user's browser."}),
+                    })
                 else:
                     tool_results.append({
                         "type": "tool_result",
@@ -208,10 +271,10 @@ class FrontendAI:
 
             self.messages.append({"role": "user", "content": tool_results})
 
-            # After delegation, the AI should produce a brief acknowledgment
+            # After delegation/action, the AI should produce a brief response
             # and end its turn (next iteration of the loop)
 
-        return ChatResult(text=final_text, pending_task_id=pending_task_id)
+        return ChatResult(text=final_text, pending_task_id=pending_task_id, page_action=page_action)
 
     async def summarize_worker_result(self, result_text: str) -> str:
         """Pass worker result through the Frontend AI for a conversational summary.
@@ -239,7 +302,7 @@ class FrontendAI:
             max_tokens=1024,
             system=self.system_prompt,
             messages=self.messages,
-            tools=DELEGATION_TOOLS,
+            tools=TOOLS,
         )
 
         # Extract text from response

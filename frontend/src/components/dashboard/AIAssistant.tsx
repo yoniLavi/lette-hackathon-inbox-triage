@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { MessageSquare, X, Send, Sparkles, ChevronRight, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -13,6 +13,11 @@ interface Message {
     role: "user" | "assistant";
     content: string;
     timestamp: Date;
+}
+
+interface AIAction {
+    action: "scrollTo" | "expand";
+    target: { type: string; id: string };
 }
 
 const WELCOME_MSG: Message = {
@@ -101,7 +106,32 @@ export function AIAssistant() {
         return name.replace(/_/g, " ");
     };
 
-    const processStream = async (url: string, body: string): Promise<{ response: string; workerTaskId?: string }> => {
+    const executeAction = (action: AIAction) => {
+        const selector = `[data-ai-target="${action.target.type}-${action.target.id}"]`;
+        const el = document.querySelector(selector);
+        if (!el) {
+            console.warn("[chat] action target not found:", selector);
+            return;
+        }
+
+        if (action.action === "expand") {
+            // Dispatch a custom event that ThreadGroup listens for
+            el.dispatchEvent(new CustomEvent("ai-expand", { bubbles: true }));
+            // Give expansion time to render, then scroll
+            setTimeout(() => {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                el.classList.add("ai-highlight");
+                el.addEventListener("animationend", () => el.classList.remove("ai-highlight"), { once: true });
+            }, 150);
+        } else {
+            // scrollTo
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.classList.add("ai-highlight");
+            el.addEventListener("animationend", () => el.classList.remove("ai-highlight"), { once: true });
+        }
+    };
+
+    const processStream = async (url: string, body: string): Promise<{ response: string; workerTaskId?: string; action?: AIAction }> => {
         console.log("[chat] fetch processStream called, url:", url);
         setStatusText("Connecting...");
         setStreamingText("");
@@ -131,6 +161,7 @@ export function AIAssistant() {
         let finalResponse = "";
         let liveText = "";
         let returnedWorkerTaskId: string | undefined;
+        let returnedAction: AIAction | undefined;
 
         console.log("[chat] starting stream read loop");
 
@@ -164,6 +195,9 @@ export function AIAssistant() {
                             setStatusText(friendlyTool(data.tool));
                         } else if (currentEvent === "progress") {
                             setStatusText(data.text || "Working...");
+                        } else if (currentEvent === "action") {
+                            returnedAction = data as AIAction;
+                            console.log("[chat] action received:", data);
                         } else if (currentEvent === "text") {
                             liveText = data.text;
                             setStreamingText(liveText);
@@ -187,6 +221,7 @@ export function AIAssistant() {
         return {
             response: finalResponse || liveText || "(no response)",
             workerTaskId: returnedWorkerTaskId,
+            action: returnedAction,
         };
     };
 
@@ -218,7 +253,7 @@ export function AIAssistant() {
         try {
             const context = serializePageContext(pageData);
             const body = JSON.stringify({ message: text, context: context || undefined });
-            const { response, workerTaskId: wid } = await processStream(`${AGENT_URL}/prompt/stream`, body);
+            const { response, workerTaskId: wid, action } = await processStream(`${AGENT_URL}/prompt/stream`, body);
 
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
@@ -229,6 +264,11 @@ export function AIAssistant() {
 
             if (wid) {
                 setWorkerTaskId(wid);
+            }
+
+            // Execute page action after message is rendered
+            if (action) {
+                setTimeout(() => executeAction(action), 100);
             }
         } catch (err) {
             setMessages(prev => [...prev, {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, Clock, Zap, MapPin, FileText, Check, X, Pencil, Users, StickyNote, MessageSquare, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { getCase, getRelatedEmails, getRelatedTasks, getNotes, contactName, senderDisplay, updateCase, updateTask, updateEmail } from "@/lib/crm";
@@ -87,6 +87,7 @@ function EmailCard({ email, isFirst }: { email: CrmEmail; isFirst: boolean }) {
     const sender = senderDisplay(email);
     return (
         <Card
+            data-ai-target={`email-${email.id}`}
             className={`p-4 border-transparent shadow-sm border-l-4 cursor-pointer transition-all ${isFirst ? "border-l-[#0F1016]/20 bg-[#F2F2EC]" : "border-l-[#0F1016]/10 bg-[#F2F2EC]"} hover:shadow-md`}
             onClick={() => setExpanded(!expanded)}
         >
@@ -118,15 +119,26 @@ function EmailCard({ email, isFirst }: { email: CrmEmail; isFirst: boolean }) {
 
 function ThreadGroup({ threadEmails }: { threadEmails: CrmEmail[] }) {
     const [expanded, setExpanded] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
     const firstEmail = threadEmails[0];
     const subject = firstEmail?.subject || "No subject";
+    const threadId = firstEmail?.thread_id || `single-${firstEmail?.id}`;
+
+    // Listen for ai-expand custom event from AIAssistant
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const handler = () => setExpanded(true);
+        el.addEventListener("ai-expand", handler);
+        return () => el.removeEventListener("ai-expand", handler);
+    }, []);
 
     if (threadEmails.length === 1) {
         return <EmailCard email={firstEmail} isFirst={false} />;
     }
 
     return (
-        <div className="space-y-0">
+        <div className="space-y-0" ref={ref} data-ai-target={`thread-${threadId}`}>
             <button
                 onClick={() => setExpanded(!expanded)}
                 className="w-full flex items-center gap-2 text-left bg-[#F2F2EC] rounded-[14px] p-3 hover:bg-[#EDEDEA] transition-colors"
@@ -166,7 +178,7 @@ function DraftCard({ draft, onUpdate }: { draft: CrmEmail; onUpdate: (e: CrmEmai
     };
 
     return (
-        <Card className="shadow-sm border-transparent bg-[#F2F2EC] mb-4">
+        <Card data-ai-target={`draft-${draft.id}`} className="shadow-sm border-transparent bg-[#F2F2EC] mb-4">
             <div className="border-b border-[#0F1016]/5 p-3 px-4 flex justify-between items-center bg-violet-50 rounded-t-xl">
                 <h3 className="font-bold text-violet-700 flex items-center text-[10px] tracking-[0.2em] uppercase">
                     Draft Response
@@ -232,10 +244,7 @@ export default function SituationDetail() {
             setLoading(false);
             if (c) {
                 const contacts = extractContacts(e);
-                const draftCount = e.filter((em: CrmEmail) => em.status === "draft").length;
-                const ctx = buildSituationContext(c, t, n, contacts);
-                ctx.draftCount = draftCount;
-                setData(ctx);
+                setData(buildSituationContext(c, e, t, n, contacts));
             }
         });
     }, [id]);
@@ -360,7 +369,7 @@ export default function SituationDetail() {
                                     </div>
                                     <div className="p-1">
                                         {tasks.map((task, i) => (
-                                            <div key={task.id} className={`p-4 hover:bg-white/30 transition-colors ${i < tasks.length - 1 ? "border-b border-[#0F1016]/5" : ""}`}>
+                                            <div key={task.id} data-ai-target={`task-${task.id}`} className={`p-4 hover:bg-white/30 transition-colors ${i < tasks.length - 1 ? "border-b border-[#0F1016]/5" : ""}`}>
                                                 <div className="flex items-start gap-3">
                                                     <input
                                                         type="checkbox"
@@ -471,7 +480,7 @@ export default function SituationDetail() {
                                     </div>
                                     <div className="p-1">
                                         {notes.map((note, i) => (
-                                            <div key={note.id} className={`p-4 ${i < notes.length - 1 ? "border-b border-[#0F1016]/5" : ""}`}>
+                                            <div key={note.id} data-ai-target={`note-${note.id}`} className={`p-4 ${i < notes.length - 1 ? "border-b border-[#0F1016]/5" : ""}`}>
                                                 <p className="text-sm text-[#0F1016]/80 font-sans leading-relaxed whitespace-pre-line">{note.content}</p>
                                                 <p className="text-[10px] text-[#0F1016]/40 font-bold uppercase tracking-wider mt-2" suppressHydrationWarning>
                                                     {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })}

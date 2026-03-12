@@ -1,8 +1,8 @@
 "use client"
 
 import React, { createContext, useContext, useState } from "react";
-import type { CrmCase, CrmTask, CrmNote, CrmContact, CrmProperty } from "./crm";
-import { contactName, caseActionStatus } from "./crm";
+import type { CrmCase, CrmEmail, CrmTask, CrmNote, CrmContact, CrmProperty } from "./crm";
+import { contactName, caseActionStatus, senderDisplay } from "./crm";
 
 // ---------- Types for structured page context ----------
 
@@ -11,7 +11,48 @@ interface DashboardContext {
     caseCount: number;
     openCaseCount: number;
     stats: { pendingTasks: number; draftsToReview: number; resolvedCases: number };
-    topCases: { id: number; name: string; priority: string; status: string; actionStatus: string; propertyName?: string }[];
+    topCases: {
+        id: number;
+        name: string;
+        priority: string;
+        status: string;
+        actionStatus: string;
+        propertyName?: string;
+        description?: string;
+        pendingTasks?: string[];
+        draftSubjects?: string[];
+    }[];
+}
+
+interface SituationEmailContext {
+    id: number;
+    subject: string;
+    from: string;
+    to: string[];
+    bodyPlain: string;
+    dateSent: string;
+    status: string;
+    threadId?: string;
+    threadPosition?: number;
+    isRead: boolean;
+    senderName?: string;
+    senderType?: string;
+}
+
+interface SituationDraftContext {
+    id: number;
+    subject: string;
+    to: string[];
+    bodyPlain: string;
+}
+
+interface SituationTaskContext {
+    id: number;
+    name: string;
+    status: string;
+    priority: string;
+    description?: string;
+    dueDate?: string;
 }
 
 interface SituationContext {
@@ -23,23 +64,39 @@ interface SituationContext {
     description: string;
     propertyName?: string;
     propertyManager?: string;
-    taskCount: number;
-    tasks: { name: string; status: string; priority: string; dueDate?: string }[];
-    draftCount: number;
-    contactNames: { name: string; type: string }[];
-    noteCount: number;
+    propertyManagerEmail?: string;
+    tasks: SituationTaskContext[];
+    drafts: SituationDraftContext[];
+    emails: SituationEmailContext[];
+    notes: { id: number; content: string; createdAt: string }[];
+    contacts: { name: string; type: string; email: string; company?: string; unit?: string }[];
 }
 
 interface PropertiesContext {
     page: "properties";
-    properties: { name: string; type: string; units: number; manager: string; caseCount: number; contactCount: number }[];
+    properties: {
+        name: string;
+        type: string;
+        units: number;
+        manager: string;
+        managerEmail: string;
+        description?: string;
+        caseCount: number;
+        contactCount: number;
+    }[];
 }
 
 interface SearchContext {
     page: "search";
     query: string;
     resultCount: number;
-    topResults: { subject: string; sender: string; dateSent: string }[];
+    topResults: {
+        subject: string;
+        sender: string;
+        dateSent: string;
+        bodySnippet?: string;
+        caseId?: number;
+    }[];
 }
 
 interface GenericContext {
@@ -91,16 +148,23 @@ export function buildDashboardContext(
             status: c.status,
             actionStatus: caseActionStatus(c).text,
             propertyName: c.property?.name,
+            description: c.description || undefined,
+            pendingTasks: c.tasks?.filter(t => t.status !== "completed").map(t => t.name),
+            draftSubjects: c.emails?.filter(e => e.status === "draft").map(e => e.subject),
         })),
     };
 }
 
 export function buildSituationContext(
     crmCase: CrmCase,
+    emails: CrmEmail[],
     tasks: CrmTask[],
     notes: CrmNote[],
     contacts: CrmContact[],
 ): SituationContext {
+    const draftEmails = emails.filter(e => e.status === "draft");
+    const nonDraftEmails = emails.filter(e => e.status !== "draft");
+
     return {
         page: "situation",
         caseId: crmCase.id,
@@ -110,19 +174,47 @@ export function buildSituationContext(
         description: crmCase.description || "",
         propertyName: crmCase.property?.name,
         propertyManager: crmCase.property?.manager,
-        taskCount: tasks.length,
+        propertyManagerEmail: crmCase.property?.manager_email,
         tasks: tasks.map(t => ({
+            id: t.id,
             name: t.name,
             status: t.status,
             priority: t.priority,
+            description: t.description || undefined,
             dueDate: t.date_end,
         })),
-        draftCount: 0, // will be set by the page
-        contactNames: contacts.map(c => ({
+        drafts: draftEmails.map(d => ({
+            id: d.id,
+            subject: d.subject,
+            to: d.to_addresses || [],
+            bodyPlain: (d.body_plain || d.body || "").replace(/<[^>]*>/g, ''),
+        })),
+        emails: nonDraftEmails.map(e => ({
+            id: e.id,
+            subject: e.subject,
+            from: e.from_address,
+            to: e.to_addresses || [],
+            bodyPlain: (e.body_plain || e.body || "").replace(/<[^>]*>/g, ''),
+            dateSent: e.date_sent,
+            status: e.status,
+            threadId: e.thread_id,
+            threadPosition: e.thread_position,
+            isRead: e.is_read,
+            senderName: contactName(e.contact) || undefined,
+            senderType: e.contact?.type,
+        })),
+        notes: notes.map(n => ({
+            id: n.id,
+            content: n.content,
+            createdAt: n.created_at,
+        })),
+        contacts: contacts.map(c => ({
             name: contactName(c) || c.email,
             type: c.type,
+            email: c.email,
+            company: c.company || undefined,
+            unit: c.unit || undefined,
         })),
-        noteCount: notes.length,
     };
 }
 
@@ -138,6 +230,8 @@ export function buildPropertiesContext(
             type: p.type,
             units: p.units,
             manager: p.manager,
+            managerEmail: p.manager_email,
+            description: p.description || undefined,
             caseCount: caseCounts[p.id] || 0,
             contactCount: contactCounts[p.id] || 0,
         })),
@@ -146,13 +240,19 @@ export function buildPropertiesContext(
 
 export function buildSearchContext(
     query: string,
-    results: { subject: string; sender: string; dateSent: string }[],
+    results: CrmEmail[],
 ): SearchContext {
     return {
         page: "search",
         query,
         resultCount: results.length,
-        topResults: results.slice(0, 10),
+        topResults: results.slice(0, 10).map(e => ({
+            subject: e.subject,
+            sender: senderDisplay(e),
+            dateSent: e.date_sent,
+            bodySnippet: (e.body_plain || e.body || "").replace(/<[^>]*>/g, '').slice(0, 200) || undefined,
+            caseId: e.case_id,
+        })),
     };
 }
 
