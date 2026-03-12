@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { Lora, JetBrains_Mono } from "next/font/google";
 import { PageDataProvider } from "@/lib/page-context";
+import { AIAssistant } from "@/components/dashboard/AIAssistant";
 import "./globals.css";
 
 const tiemposFallback = Lora({
@@ -33,6 +34,7 @@ export default function RootLayout({
         <div className="relative z-10 w-full h-full">
           {children}
         </div>
+        <AIAssistant />
         </PageDataProvider>
       </body>
     </html>

@@ -7,7 +7,6 @@ import { caseActionStatus } from "@/lib/crm";
 import { usePageData, buildDashboardContext } from "@/lib/page-context";
 import { SituationCard } from "@/components/dashboard/SituationCard";
 import { QuickStats } from "@/components/dashboard/QuickStats";
-import { AIAssistant } from "@/components/dashboard/AIAssistant";
 import { Plus, User } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
@@ -182,7 +181,6 @@ export default function Dashboard() {
                     </div>
                 </div>
             </main>
-            <AIAssistant />
         </div>
     );
 }
