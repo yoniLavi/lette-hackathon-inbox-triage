@@ -22,8 +22,8 @@
 - [x] 3.6 Execute action after `done` event is processed (after assistant message is added to chat)
 
 ### 4. Integration
-- [ ] 4.1 Verify end-to-end: user asks "show me the draft", AI returns scrollTo action + text response, frontend scrolls and highlights the draft
-- [ ] 4.2 Verify context enrichment: user asks "what do you think of this draft?", AI answers from full draft body in page context
+- [x] 4.1 Verify end-to-end: user asks "show me the draft", AI returns scrollTo action + text response, frontend scrolls and highlights the draft
+- [x] 4.2 Verify context enrichment: user asks "what do you think of this draft?", AI answers from full draft body in page context
 
 ### Phase 2: Navigate action (deferred)
 - [ ] 5.1 Add `navigate` action type to protocol
