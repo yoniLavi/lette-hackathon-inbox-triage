@@ -54,6 +54,8 @@ export function AIAssistant() {
     const [streamingText, setStreamingText] = useState("");
     const [workerTaskId, setWorkerTaskId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const queuedMessage = useRef<string | null>(null);
+    const loadingRef = useRef(false);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -156,7 +158,7 @@ export function AIAssistant() {
                         if (currentEvent === "status") {
                             const label = data.status === "connecting" ? "Connecting..."
                                 : data.status === "querying_crm" ? "Searching CRM..."
-                                : "Thinking...";
+                                : "Typing...";
                             setStatusText(label);
                         } else if (currentEvent === "tool_use") {
                             setStatusText(friendlyTool(data.tool));
@@ -199,9 +201,7 @@ export function AIAssistant() {
         } catch { /* ignore */ }
     };
 
-    const handleSend = async (text: string) => {
-        if (!text.trim() || loading) return;
-
+    const sendOne = async (text: string) => {
         const userMsg: Message = {
             id: Date.now().toString(),
             role: "user",
@@ -210,8 +210,8 @@ export function AIAssistant() {
         };
 
         setMessages(prev => [...prev, userMsg]);
-        setInputValue("");
         setLoading(true);
+        loadingRef.current = true;
         setStatusText("Connecting...");
         setStreamingText("");
 
@@ -227,7 +227,6 @@ export function AIAssistant() {
                 timestamp: new Date()
             }]);
 
-            // If worker was delegated, start polling for results
             if (wid) {
                 setWorkerTaskId(wid);
             }
@@ -240,8 +239,34 @@ export function AIAssistant() {
             }]);
         } finally {
             setLoading(false);
+            loadingRef.current = false;
             setStatusText("");
             setStreamingText("");
+
+            // Process queued message if any
+            const queued = queuedMessage.current;
+            if (queued) {
+                queuedMessage.current = null;
+                sendOne(queued);
+            }
+        }
+    };
+
+    const handleSend = (text: string) => {
+        if (!text.trim()) return;
+        setInputValue("");
+
+        if (loadingRef.current) {
+            // Queue message — show it in chat immediately, send after current response
+            queuedMessage.current = text;
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                role: "user",
+                content: text,
+                timestamp: new Date()
+            }]);
+        } else {
+            sendOne(text);
         }
     };
 
@@ -266,7 +291,7 @@ export function AIAssistant() {
                                     <div className="flex items-center gap-1.5">
                                         <div className={`w-1.5 h-1.5 rounded-full ${loading || workerTaskId ? "bg-amber-400" : "bg-emerald-400"} animate-pulse`} />
                                         <span className="text-[11px] text-white/60 uppercase tracking-widest font-bold">
-                                            {loading ? (statusText || "Thinking...") : workerTaskId ? "Searching CRM..." : "Online"}
+                                            {loading ? (statusText || "Typing...") : workerTaskId ? "Searching CRM..." : "Online"}
                                         </span>
                                     </div>
                                 </div>
@@ -384,14 +409,13 @@ export function AIAssistant() {
                                             handleSend(inputValue);
                                         }
                                     }}
-                                    placeholder={loading ? "Waiting for response..." : "Ask anything about your tasks..."}
-                                    disabled={loading}
+                                    placeholder="Ask anything about your tasks..."
                                     rows={1}
-                                    className="w-full pl-5 pr-14 py-4 bg-slate-50 border border-slate-200 rounded-[20px] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0000EE]/20 focus:border-[#0000EE] transition-all placeholder:text-slate-400 font-sans disabled:opacity-50 resize-none overflow-y-auto scrollbar-hide"
+                                    className="w-full pl-5 pr-14 py-4 bg-slate-50 border border-slate-200 rounded-[20px] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0000EE]/20 focus:border-[#0000EE] transition-all placeholder:text-slate-400 font-sans resize-none overflow-y-auto scrollbar-hide"
                                 />
                                 <button
                                     type="submit"
-                                    disabled={!inputValue.trim() || loading}
+                                    disabled={!inputValue.trim()}
                                     className="absolute right-2 bottom-2 w-10 h-10 bg-[#0000EE] text-white rounded-full flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#0000CC] transition-all"
                                 >
                                     <Send className="w-4 h-4" />
