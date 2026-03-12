@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Clock, Zap, MapPin, FileText, Send, MoreVertical, Users, StickyNote, MessageSquare, ChevronDown } from "lucide-react";
+import { ArrowLeft, Clock, Zap, MapPin, FileText, Check, X, Pencil, Users, StickyNote, MessageSquare, ChevronDown } from "lucide-react";
 import Link from "next/link";
-import { getCase, getRelatedEmails, getRelatedTasks, getNotes, contactName, senderDisplay } from "@/lib/crm";
+import { getCase, getRelatedEmails, getRelatedTasks, getNotes, contactName, senderDisplay, updateCase, updateTask, updateEmail } from "@/lib/crm";
 import type { CrmCase, CrmEmail, CrmTask, CrmNote, CrmContact } from "@/lib/crm";
 import { usePageData, buildSituationContext } from "@/lib/page-context";
 import { UrgencyBadge } from "@/components/ui/Badge";
@@ -147,6 +147,67 @@ function ThreadGroup({ threadEmails }: { threadEmails: CrmEmail[] }) {
     );
 }
 
+function DraftCard({ draft, onUpdate }: { draft: CrmEmail; onUpdate: (e: CrmEmail) => void }) {
+    const [editing, setEditing] = useState(false);
+    const [editBody, setEditBody] = useState(draft.body?.replace(/<[^>]*>/g, '') || "");
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await updateEmail(draft.id, { body: editBody, body_plain: editBody });
+            onUpdate({ ...draft, body: editBody, body_plain: editBody });
+            setEditing(false);
+        } catch (e) {
+            console.error("Failed to save draft:", e);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Card className="shadow-sm border-transparent bg-[#F2F2EC] mb-4">
+            <div className="border-b border-[#0F1016]/5 p-3 px-4 flex justify-between items-center bg-violet-50 rounded-t-xl">
+                <h3 className="font-bold text-violet-700 flex items-center text-[10px] tracking-[0.2em] uppercase">
+                    Draft Response
+                </h3>
+            </div>
+            <div className="p-4 border-b border-[#0F1016]/5 space-y-2 text-[13px]">
+                <div className="flex font-medium"><span className="w-16 text-[#0F1016]/40 font-bold uppercase text-[10px] pt-0.5">To:</span> <span className="text-[#0F1016]">{(draft.to_addresses || []).join(", ")}</span></div>
+                <div className="flex font-medium"><span className="w-16 text-[#0F1016]/40 font-bold uppercase text-[10px] pt-0.5">Subject:</span> <span className="text-[#0F1016]">{draft.subject}</span></div>
+            </div>
+            {editing ? (
+                <textarea
+                    value={editBody}
+                    onChange={(e) => setEditBody(e.target.value)}
+                    className="w-full p-4 bg-white font-sans text-sm text-[#0F1016] leading-relaxed min-h-[120px] resize-y outline-none focus:ring-2 focus:ring-[#0000EE]/20"
+                    autoFocus
+                />
+            ) : (
+                <div className="p-4 bg-white/50 font-sans text-sm text-[#0F1016]/80 leading-relaxed italic whitespace-pre-line">
+                    {draft.body?.replace(/<[^>]*>/g, '') || ""}
+                </div>
+            )}
+            <div className="p-3 bg-[#0F1016]/5 rounded-b-xl border-t border-[#0F1016]/5 flex justify-end items-center">
+                {editing ? (
+                    <div className="flex gap-2">
+                        <Button variant="secondary" size="sm" className="rounded-full shadow-sm text-[10px] font-bold uppercase tracking-wider" onClick={() => { setEditing(false); setEditBody(draft.body?.replace(/<[^>]*>/g, '') || ""); }}>
+                            <X className="w-3 h-3 mr-1" /> Cancel
+                        </Button>
+                        <Button size="sm" className="rounded-full shadow-sm text-[10px] font-bold uppercase tracking-wider" onClick={handleSave} disabled={saving}>
+                            <Check className="w-3 h-3 mr-1" /> {saving ? "Saving..." : "Save"}
+                        </Button>
+                    </div>
+                ) : (
+                    <Button variant="secondary" size="sm" className="rounded-full shadow-sm text-[10px] font-bold uppercase tracking-wider" onClick={() => setEditing(true)}>
+                        <Pencil className="w-3 h-3 mr-1" /> Edit
+                    </Button>
+                )}
+            </div>
+        </Card>
+    );
+}
+
 export default function SituationDetail() {
     const params = useParams();
     const id = params.id as string;
@@ -223,12 +284,20 @@ export default function SituationDetail() {
                         <ArrowLeft className="w-3 h-3 mr-1.5" /> Back to Dashboard
                     </Link>
                     <div className="flex gap-3">
-                        <Button variant="secondary" size="fixed" className="px-4 py-1.5 rounded-full shadow-sm text-sm">
-                            Edit Details
-                        </Button>
-                        <Button size="fixed" className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white px-4 py-1.5 rounded-full shadow-sm text-sm hover:-translate-y-0.5 transition-all">
-                            Close Case
-                        </Button>
+                        {crmCase.status !== "closed" ? (
+                            <Button
+                                size="fixed"
+                                className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white px-4 py-1.5 rounded-full shadow-sm text-sm hover:-translate-y-0.5 transition-all"
+                                onClick={async () => {
+                                    await updateCase(crmCase.id, { status: "closed" });
+                                    setCrmCase({ ...crmCase, status: "closed" });
+                                }}
+                            >
+                                <Check className="w-4 h-4 mr-1.5" /> Close Case
+                            </Button>
+                        ) : (
+                            <span className="px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-sm font-bold border border-emerald-200">Closed</span>
+                        )}
                     </div>
                 </div>
             </header>
@@ -293,7 +362,16 @@ export default function SituationDetail() {
                                         {tasks.map((task, i) => (
                                             <div key={task.id} className={`p-4 hover:bg-white/30 transition-colors ${i < tasks.length - 1 ? "border-b border-[#0F1016]/5" : ""}`}>
                                                 <div className="flex items-start gap-3">
-                                                    <input type="checkbox" className="mt-1 rounded border-[#0F1016]/20 text-[#0000EE] focus:ring-[#0000EE] w-4 h-4 cursor-pointer" readOnly checked={task.status === "completed"} />
+                                                    <input
+                                                        type="checkbox"
+                                                        className="mt-1 rounded border-[#0F1016]/20 text-[#0000EE] focus:ring-[#0000EE] w-4 h-4 cursor-pointer"
+                                                        checked={task.status === "completed"}
+                                                        onChange={async () => {
+                                                            const newStatus = task.status === "completed" ? "not_started" : "completed";
+                                                            await updateTask(task.id, { status: newStatus });
+                                                            setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+                                                        }}
+                                                    />
                                                     <div className="flex-1">
                                                         <h4 className="font-bold text-[#0F1016] text-sm">{task.name}</h4>
                                                         {task.priority && (
@@ -320,31 +398,9 @@ export default function SituationDetail() {
                         {draftEmails.length > 0 && (
                             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
                                 {draftEmails.map(draft => (
-                                    <Card key={draft.id} className="shadow-sm border-transparent bg-[#F2F2EC] mb-4">
-                                        <div className="border-b border-[#0F1016]/5 p-3 px-4 flex justify-between items-center bg-violet-50 rounded-t-xl">
-                                            <h3 className="font-bold text-violet-700 flex items-center text-[10px] tracking-[0.2em] uppercase">
-                                                Draft Response
-                                            </h3>
-                                            <div className="flex gap-2">
-                                                <button className="p-1 hover:bg-[#0F1016]/10 rounded text-[#0F1016]/40"><MoreVertical className="w-4 h-4" /></button>
-                                            </div>
-                                        </div>
-                                        <div className="p-4 border-b border-[#0F1016]/5 space-y-2 text-[13px]">
-                                            <div className="flex font-medium"><span className="w-16 text-[#0F1016]/40 font-bold uppercase text-[10px] pt-0.5">To:</span> <span className="text-[#0F1016]">{(draft.to_addresses || []).join(", ")}</span></div>
-                                            <div className="flex font-medium"><span className="w-16 text-[#0F1016]/40 font-bold uppercase text-[10px] pt-0.5">Subject:</span> <span className="text-[#0F1016]">{draft.subject}</span></div>
-                                        </div>
-                                        <div className="p-4 bg-white/50 font-sans text-sm text-[#0F1016]/80 leading-relaxed italic whitespace-pre-line">
-                                            {draft.body?.replace(/<[^>]*>/g, '') || ""}
-                                        </div>
-                                        <div className="p-3 bg-[#0F1016]/5 rounded-b-xl border-t border-[#0F1016]/5 flex justify-end items-center">
-                                            <div className="flex gap-2">
-                                                <Button variant="secondary" size="sm" className="rounded-full shadow-sm text-[10px] font-bold uppercase tracking-wider">Edit</Button>
-                                                <Button size="sm" className="rounded-full shadow-sm text-[10px] font-bold uppercase tracking-wider">
-                                                    <Send className="w-4 h-4 mr-2" /> Send via CRM
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </Card>
+                                    <DraftCard key={draft.id} draft={draft} onUpdate={(updated) => {
+                                        setEmails(prev => prev.map(e => e.id === updated.id ? updated : e));
+                                    }} />
                                 ))}
                             </motion.div>
                         )}

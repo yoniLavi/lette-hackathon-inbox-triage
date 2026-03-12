@@ -79,8 +79,8 @@ export default function SearchPage() {
                         {results.map(email => {
                             const sender = senderDisplay(email);
                             const bodySnippet = (email.body_plain || email.body || "").replace(/<[^>]*>/g, '').slice(0, 200);
-                            return (
-                                <Card key={email.id} className="p-4 bg-[#F2F2EC] border-transparent hover:shadow-md transition-shadow hover:translate-x-1">
+                            const inner = (
+                                <Card className={`p-4 bg-[#F2F2EC] border-transparent transition-shadow ${email.case_id ? "hover:shadow-md hover:translate-x-1 cursor-pointer" : ""}`}>
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="flex items-center gap-2">
                                             <p className="font-bold text-[#0F1016] text-sm">{sender}</p>
@@ -95,6 +95,11 @@ export default function SearchPage() {
                                         <p className="text-xs text-[#0F1016]/60 font-sans line-clamp-2">{bodySnippet}</p>
                                     )}
                                 </Card>
+                            );
+                            return email.case_id ? (
+                                <Link key={email.id} href={`/situations/${email.case_id}`}>{inner}</Link>
+                            ) : (
+                                <div key={email.id}>{inner}</div>
                             );
                         })}
                         {results.length === 0 && (

@@ -126,6 +126,32 @@ export interface CrmThread {
     contact?: CrmContact | null;
 }
 
+async function crmPatch(path: string, body: Record<string, unknown>) {
+    const url = new URL("/api/crm", window.location.origin);
+    url.searchParams.set("path", path);
+    const res = await fetch(url.toString(), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        throw new Error(`CRM PATCH ${path}: ${res.status} ${res.statusText}`);
+    }
+    return res.json();
+}
+
+export async function updateCase(id: number, data: Record<string, unknown>) {
+    return crmPatch(`cases/${id}`, data);
+}
+
+export async function updateTask(id: number, data: Record<string, unknown>) {
+    return crmPatch(`tasks/${id}`, data);
+}
+
+export async function updateEmail(id: number, data: Record<string, unknown>) {
+    return crmPatch(`emails/${id}`, data);
+}
+
 // --- Fetch functions ---
 
 export async function getCases(include?: string): Promise<CrmCase[]> {

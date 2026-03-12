@@ -1,13 +1,12 @@
 "use client"
 
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCases, getCounts, getDraftCount } from "@/lib/crm";
 import type { CrmCase } from "@/lib/crm";
 import { caseActionStatus } from "@/lib/crm";
 import { usePageData, buildDashboardContext } from "@/lib/page-context";
 import { SituationCard } from "@/components/dashboard/SituationCard";
 import { QuickStats } from "@/components/dashboard/QuickStats";
-import { Plus, User } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { motion } from "framer-motion";
@@ -85,14 +84,6 @@ export default function Dashboard() {
                                 Search
                             </Button>
                         </Link>
-                        <Button className="h-9 px-5 rounded-full bg-[#0F1016] text-white hover:bg-black text-[12px] font-sans font-bold shadow-lg transition-all hidden md:flex">
-                            <Plus size={16} className="mr-2" />
-                            New Situation
-                        </Button>
-                        <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#0F1016]/10 hover:bg-[#0F1016]/5 transition-all text-[#0F1016] font-sans font-bold text-[14px]">
-                            <User size={18} />
-                            Portal
-                        </button>
                     </div>
                 </div>
             </nav>

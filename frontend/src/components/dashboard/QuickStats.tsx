@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link";
-import { Filter, ChevronDown } from "lucide-react";
 
 const StatCard = ({ label, value, color }: { label: string, value: string, color?: string }) => (
     <div className="bg-[#F2F2EC] rounded-[20px] p-4 flex flex-col items-center text-center">
@@ -21,19 +20,6 @@ export function QuickStats({ taskCount, draftCount, closedCount }: { taskCount: 
                 <StatCard label="Pending Tasks" value={String(taskCount).padStart(2, "0")} color="text-[#0000EE]" />
                 <StatCard label="Drafts to Review" value={String(draftCount).padStart(2, "0")} color="text-violet-600" />
                 <StatCard label="Resolved" value={String(closedCount).padStart(2, "0")} />
-            </div>
-
-            <div className="bg-[#F2F2EC] rounded-[20px] p-4">
-                <h3 className="text-[10px] font-sans font-bold text-[#0F1016]/40 uppercase tracking-[0.2em] mb-3 flex items-center">
-                    <Filter className="w-3 h-3 mr-2" /> Filters
-                </h3>
-                <div className="space-y-2">
-                    {['All Properties', 'All Types'].map((filter) => (
-                        <button key={filter} className="w-full flex justify-between items-center text-left text-[12px] font-sans font-medium text-[#0F1016] border-b border-black/5 pb-2 hover:border-black/20 transition-all">
-                            {filter} <ChevronDown className="w-3 h-3 text-[#0F1016]/40" />
-                        </button>
-                    ))}
-                </div>
             </div>
 
             <div className="bg-[#F2F2EC] rounded-[20px] p-4">
