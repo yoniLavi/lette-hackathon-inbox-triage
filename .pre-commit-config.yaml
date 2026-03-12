@@ -1,0 +1,23 @@
+repos:
+  - repo: local
+    hooks:
+      - id: typescript-check
+        name: TypeScript type check
+        entry: bash -c 'cd frontend && npx tsc --noEmit'
+        language: system
+        pass_filenames: false
+        files: ^frontend/.*\.(ts|tsx)$
+
+      - id: integration-tests
+        name: Integration tests (CRM + agent API)
+        entry: bash -c 'uv run --with pytest --with httpx -- pytest tests/test_crm_api.py tests/test_agent_api.py -v'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: e2e-tests
+        name: E2E Playwright tests
+        entry: bash -c 'uv run --with playwright --with pytest --with httpx -- pytest tests/test_frontend_e2e.py -v'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
