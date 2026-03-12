@@ -53,6 +53,15 @@ body {
   /* slate-400 */
 }
 
+/* Hide scrollbar but keep scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Chat markdown spacing — ReactMarkdown strips default margins */
 .chat-markdown p,
 .chat-markdown ul,

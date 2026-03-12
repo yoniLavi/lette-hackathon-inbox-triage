@@ -155,20 +155,24 @@ mcp_worker.configure(ensure_worker=_ensure_worker)
 
 
 async def _background_worker_complete(task_id: str) -> None:
-    """Background task: await worker result, store for polling, inject into frontend history."""
+    """Background task: await worker result, summarize via Frontend AI, store for polling."""
     global _pending_worker_result, _pending_worker_task_id
     try:
         worker_text = await mcp_worker.await_result(task_id, timeout=_RESPONSE_TIMEOUT)
-        _pending_worker_result = {"task_id": task_id, "text": worker_text}
+        log.info("[worker-bg] raw result task=%s (%d chars)", task_id, len(worker_text))
+
+        # Pass through Frontend AI for conversational summary
         if _frontend_ai is not None:
-            _frontend_ai.inject_worker_result(worker_text)
-        log.info("[worker-bg] result ready task=%s (%d chars)", task_id, len(worker_text))
+            summary = await _frontend_ai.summarize_worker_result(worker_text)
+        else:
+            summary = worker_text  # fallback if frontend AI is gone
+
+        _pending_worker_result = {"task_id": task_id, "text": summary}
+        log.info("[worker-bg] summary ready task=%s (%d chars)", task_id, len(summary))
     except Exception as exc:
         log.error("[worker-bg] error task=%s: %s", task_id, exc)
-        error_text = f"Sorry, the CRM lookup failed: {exc}"
+        error_text = f"Sorry, I couldn't fetch that from the CRM: {exc}"
         _pending_worker_result = {"task_id": task_id, "text": error_text}
-        if _frontend_ai is not None:
-            _frontend_ai.inject_worker_result(f"[Worker error: {exc}]")
     finally:
         _pending_worker_task_id = None
 

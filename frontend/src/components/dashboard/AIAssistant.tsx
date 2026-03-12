@@ -371,18 +371,28 @@ export function AIAssistant() {
                                 onSubmit={(e) => { e.preventDefault(); handleSend(inputValue); }}
                                 className="relative"
                             >
-                                <input
-                                    type="text"
+                                <textarea
                                     value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
+                                    onChange={(e) => {
+                                        setInputValue(e.target.value);
+                                        e.target.style.height = "auto";
+                                        e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSend(inputValue);
+                                        }
+                                    }}
                                     placeholder={loading ? "Waiting for response..." : "Ask anything about your tasks..."}
                                     disabled={loading}
-                                    className="w-full pl-5 pr-14 py-4 bg-slate-50 border border-slate-200 rounded-full text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0000EE]/20 focus:border-[#0000EE] transition-all placeholder:text-slate-400 font-sans disabled:opacity-50"
+                                    rows={1}
+                                    className="w-full pl-5 pr-14 py-4 bg-slate-50 border border-slate-200 rounded-[20px] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0000EE]/20 focus:border-[#0000EE] transition-all placeholder:text-slate-400 font-sans disabled:opacity-50 resize-none overflow-y-auto scrollbar-hide"
                                 />
                                 <button
                                     type="submit"
                                     disabled={!inputValue.trim() || loading}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#0000EE] text-white rounded-full flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#0000CC] transition-all"
+                                    className="absolute right-2 bottom-2 w-10 h-10 bg-[#0000EE] text-white rounded-full flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#0000CC] transition-all"
                                 >
                                     <Send className="w-4 h-4" />
                                 </button>

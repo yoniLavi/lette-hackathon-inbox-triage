@@ -213,16 +213,47 @@ class FrontendAI:
 
         return ChatResult(text=final_text, pending_task_id=pending_task_id)
 
-    def inject_worker_result(self, result_text: str) -> None:
-        """Inject a worker result into conversation history for follow-up context.
+    async def summarize_worker_result(self, result_text: str) -> str:
+        """Pass worker result through the Frontend AI for a conversational summary.
 
-        Added as an assistant message so the AI sees it as its own prior response.
+        Injects the raw worker data as internal context, then generates a brief,
+        conversational response that the user actually sees.
         """
+        # Inject as a user message (internal — not shown to user) so the AI
+        # can see the data and respond conversationally.
+        self.messages.append({
+            "role": "user",
+            "content": (
+                "[Internal: worker result — do NOT repeat this verbatim. "
+                "Summarize conversationally in 2-4 sentences. Highlight only "
+                "what matters most. The user can see the full data on the page.]\n\n"
+                + result_text
+            ),
+        })
+
+        log.info("[chat] summarizing worker result (%d chars)...", len(result_text))
+
+        response = await asyncio.to_thread(
+            self.client.messages.create,
+            model=self.model,
+            max_tokens=1024,
+            system=self.system_prompt,
+            messages=self.messages,
+            tools=DELEGATION_TOOLS,
+        )
+
+        # Extract text from response
+        text_parts = [b.text for b in response.content if b.type == "text" and b.text]
+        summary = "\n\n".join(text_parts) or result_text  # fallback to raw if empty
+
+        # Add the AI's summary to conversation history
         self.messages.append({
             "role": "assistant",
-            "content": [{"type": "text", "text": result_text}],
+            "content": [{"type": "text", "text": summary}],
         })
-        log.info("[chat] injected worker result (%d chars) into history", len(result_text))
+
+        log.info("[chat] worker summary: %s", summary[:120])
+        return summary
 
     def reset(self) -> None:
         """Clear conversation history for a fresh session."""
