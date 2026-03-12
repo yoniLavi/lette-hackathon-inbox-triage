@@ -358,6 +358,7 @@ export function AIAssistant() {
                             {messages.map((msg) => (
                                 <div
                                     key={msg.id}
+                                    data-msg-id={msg.id}
                                     className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                                 >
                                     <div className={`max-w-[85%] rounded-[24px] p-4 ${msg.role === "user"
