@@ -7,10 +7,7 @@ import { caseActionStatus } from "@/lib/crm";
 import { usePageData, buildDashboardContext } from "@/lib/page-context";
 import { SituationCard } from "@/components/dashboard/SituationCard";
 import { QuickStats } from "@/components/dashboard/QuickStats";
-import { Button } from "@/components/ui/Button";
-import { Logo } from "@/components/ui/Logo";
 import { motion } from "framer-motion";
-import Link from "next/link";
 
 // Map CRM priority to urgency tier
 function priorityToTier(priority: string): "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" {
@@ -74,19 +71,6 @@ export default function Dashboard() {
                 <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#FF8A00] opacity-[0.03] blur-[120px] rounded-full" />
                 <div className="absolute bottom-[20%] left-[-10%] w-[40%] h-[40%] bg-[#0000EE] opacity-[0.02] blur-[120px] rounded-full" />
             </div>
-
-            <nav className="w-full flex justify-center px-4 md:px-12 py-8">
-                <div className="max-w-7xl w-full flex items-center justify-between">
-                    <Logo />
-                    <div className="flex items-center gap-3">
-                        <Link href="/search">
-                            <Button className="h-9 px-5 rounded-full bg-[#F2F2EC] text-[#0F1016] hover:bg-[#0F1016]/10 text-[12px] font-sans font-bold transition-all hidden md:flex border border-[#0F1016]/10">
-                                Search
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
-            </nav>
 
             <main className="flex-1 w-full max-w-[1440px] mx-auto px-4 md:px-8 pb-16">
                 <header className="min-h-[50vh] flex flex-col items-center justify-center text-center py-12">
