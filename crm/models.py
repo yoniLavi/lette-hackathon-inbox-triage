@@ -4,6 +4,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -27,6 +28,7 @@ class Shift(Base):
     drafts_created = Column(Integer, default=0)
     tasks_created = Column(Integer, default=0)
     summary = Column(Text)
+    cost_usd = Column(Float)
     case_id = Column(Integer, ForeignKey("cases.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())

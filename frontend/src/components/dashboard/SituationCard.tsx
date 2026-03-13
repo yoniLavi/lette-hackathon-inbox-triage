@@ -67,7 +67,7 @@ export function SituationCard({ crmCase, tier }: { crmCase: CrmCase; tier: Urgen
                                 <div className="bg-white/50 border border-white/40 p-3 rounded-[14px]">
                                     <div className="flex items-center gap-1.5 mb-1">
                                         <Sparkles className="w-3 h-3 text-[#0000EE]" />
-                                        <span className="text-[9px] font-sans font-bold text-[#0000EE] uppercase tracking-widest">Lette Summary</span>
+                                        <span className="text-[9px] font-sans font-bold text-[#0000EE] uppercase tracking-widest">AI Summary</span>
                                     </div>
                                     <p className="text-[13px] font-serif text-[#0F1016] leading-snug line-clamp-3">
                                         {crmCase.description}

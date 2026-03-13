@@ -44,3 +44,9 @@ async def init_db():
                 "ALTER TABLE properties ADD COLUMN IF NOT EXISTS manager_email VARCHAR(255)"
             )
         )
+        # Add cost_usd column to shifts if missing
+        await conn.execute(
+            text(
+                "ALTER TABLE shifts ADD COLUMN IF NOT EXISTS cost_usd DOUBLE PRECISION"
+            )
+        )

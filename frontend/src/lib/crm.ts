@@ -136,6 +136,7 @@ export interface CrmShift {
     drafts_created: number;
     tasks_created: number;
     summary: string | null;
+    cost_usd: number | null;
     case_id: number | null;
     created_at: string;
     updated_at: string;

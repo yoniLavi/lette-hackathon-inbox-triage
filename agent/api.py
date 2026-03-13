@@ -27,6 +27,7 @@ from claude_code_sdk import ClaudeSDKClient
 from claude_code_sdk.types import (
     AssistantMessage,
     ClaudeCodeOptions,
+    ResultMessage,
     TextBlock,
     ToolUseBlock,
 )
@@ -413,12 +414,62 @@ async def _crm_update_shift(shift_id: int, data: dict) -> None:
         resp.raise_for_status()
 
 
+async def _fetch_thread_subject(thread_id: str) -> str | None:
+    """Fetch a thread's subject from CRM. Returns None on failure."""
+    import httpx
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{_CRM_API_URL}/api/threads/{thread_id}", timeout=5)
+            if resp.status_code == 200:
+                subj = resp.json().get("subject", "")
+                return subj[:60] if subj else None
+    except Exception:
+        pass
+    return None
+
+
+async def _progress_from_crm_cmd(cmd: str, current_subject: str | None) -> tuple[str | None, str | None]:
+    """Derive a progress message from a crm CLI command.
+
+    Returns (progress_message, updated_current_subject).
+    """
+    parts = cmd.split()
+    if len(parts) < 3:
+        return None, current_subject
+    entity, action = parts[1], parts[2]
+    ctx = f": {current_subject}" if current_subject else "..."
+
+    if entity == "threads" and action == "list":
+        return "Scanning email threads...", current_subject
+    if entity == "threads" and action == "get" and len(parts) > 3 and parts[3].isdigit():
+        subj = await _fetch_thread_subject(parts[3])
+        if subj:
+            return f'Reading thread: {subj}', subj
+        return "Reading thread...", current_subject
+    if entity == "emails" and action in ("get", "list"):
+        return f"Reading emails{ctx}", current_subject
+    if entity == "cases" and action == "create":
+        return f"Creating case{ctx}", current_subject
+    if entity == "tasks" and action == "create":
+        return f"Creating task{ctx}", current_subject
+    if entity == "emails" and action == "create":
+        return f"Drafting reply{ctx}", current_subject
+    if entity == "notes" and action == "create":
+        return f"Writing case notes{ctx}", current_subject
+    if entity in ("emails", "threads") and action == "update":
+        return f"Updating records{ctx}", current_subject
+    return None, current_subject
+
+
 async def _run_shift_background(shift_id: int) -> None:
     """Run the shift skill in background, update Shift record on completion."""
     global _busy, _active_shift_id, _worker_msg_count
+    import re as _re
     import time as _time
     t0 = _time.monotonic()
     tool_count = 0
+    cost_usd: float | None = None
+    last_progress_update = 0.0  # monotonic time of last CRM progress update
     try:
         await _teardown_worker()
         client = await _ensure_worker()
@@ -426,12 +477,20 @@ async def _run_shift_background(shift_id: int) -> None:
         await client.query("/shift")
 
         text_parts: list[str] = []
+        progress_msg = "Starting shift..."
+        current_subject: str | None = None  # tracks the thread subject being processed
+        threads_read = 0
+        emails_read = 0
         loop = asyncio.get_event_loop()
         cm = asyncio.timeout_at(loop.time() + _RESPONSE_TIMEOUT)
         async with cm:
             async for msg in client.receive_response():
                 cm.reschedule(loop.time() + _RESPONSE_TIMEOUT)
-                if isinstance(msg, AssistantMessage):
+                if isinstance(msg, ResultMessage):
+                    cost_usd = msg.total_cost_usd
+                    log.info("[shift] result: cost=$%.4f turns=%d duration=%dms",
+                             cost_usd or 0, msg.num_turns, msg.duration_ms)
+                elif isinstance(msg, AssistantMessage):
                     for block in msg.content:
                         if isinstance(block, ToolUseBlock):
                             tool_count += 1
@@ -439,11 +498,52 @@ async def _run_shift_background(shift_id: int) -> None:
                             log.info("[shift] tool #%d: %s (%.0fs elapsed)",
                                      tool_count, block.name, elapsed)
                             text_parts.clear()
+
+                            # Extract progress from crm commands
+                            cmd = (block.input or {}).get("command", "") if isinstance(block.input, dict) else ""
+                            if cmd.startswith("crm "):
+                                parts = cmd.split()
+                                if len(parts) >= 3:
+                                    if parts[1] == "threads" and parts[2] == "get":
+                                        threads_read += 1
+                                    elif parts[1] == "emails" and parts[2] == "get":
+                                        emails_read += 1
+                                new_progress, current_subject = await _progress_from_crm_cmd(cmd, current_subject)
+                                if new_progress:
+                                    progress_msg = new_progress
+
+                            # Debounce progress updates to CRM (every 5s)
+                            now = _time.monotonic()
+                            if now - last_progress_update >= 5:
+                                last_progress_update = now
+                                try:
+                                    await _crm_update_shift(shift_id, {
+                                        "summary": progress_msg,
+                                        "threads_processed": threads_read,
+                                        "emails_processed": emails_read,
+                                    })
+                                except Exception:
+                                    pass  # non-critical
+
                         elif isinstance(block, TextBlock):
                             text_parts.append(block.text)
                             snippet = block.text[:120].replace("\n", " ")
                             log.info("[shift] text: %s%s", snippet,
                                      "…" if len(block.text) > 120 else "")
+
+                            # Extract progress from text — look for thread/email subjects
+                            subj = _re.search(r'["\u201c]([^"\u201d]{10,80})["\u201d]', block.text)
+                            if subj:
+                                progress_msg = f'Looking at "{subj.group(1)}"'
+
+                            # Also update CRM on text blocks (debounced)
+                            now = _time.monotonic()
+                            if now - last_progress_update >= 5:
+                                last_progress_update = now
+                                try:
+                                    await _crm_update_shift(shift_id, {"summary": progress_msg})
+                                except Exception:
+                                    pass
 
         _worker_msg_count += 1
         elapsed = _time.monotonic() - t0
@@ -452,12 +552,15 @@ async def _run_shift_background(shift_id: int) -> None:
 
         # Parse metrics from summary text (best-effort)
         metrics = _parse_shift_summary(summary)
-        await _crm_update_shift(shift_id, {
+        update_data: dict = {
             "status": "completed",
             "completed_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
             "summary": summary,
             **metrics,
-        })
+        }
+        if cost_usd is not None:
+            update_data["cost_usd"] = round(cost_usd, 4)
+        await _crm_update_shift(shift_id, update_data)
     except TimeoutError:
         elapsed = _time.monotonic() - t0
         log.error("[shift] timeout after %.0fs (%d tool calls)", elapsed, tool_count)

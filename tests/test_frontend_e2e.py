@@ -365,7 +365,8 @@ def test_situation_has_ai_target_attributes(page: Page):
     target_values = [targets.nth(i).get_attribute("data-ai-target") for i in range(count)]
     has_task = any(t.startswith("task-") for t in target_values if t)
     has_draft = any(t.startswith("draft-") for t in target_values if t)
-    assert has_task or has_draft, f"Expected task or draft targets, got: {target_values}"
+    has_note = any(t.startswith("note-") for t in target_values if t)
+    assert has_task or has_draft or has_note, f"Expected task, draft, or note targets, got: {target_values}"
 
 
 def test_enriched_context_answers_draft_question(page: Page):

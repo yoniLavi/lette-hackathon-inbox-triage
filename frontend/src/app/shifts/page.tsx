@@ -19,6 +19,22 @@ function formatDuration(startedAt: string, completedAt: string | null): string {
     return `${mins}m ${remSecs}s`;
 }
 
+function ElapsedTimer({ startedAt }: { startedAt: string }) {
+    const [elapsed, setElapsed] = useState("");
+    useEffect(() => {
+        const update = () => {
+            const secs = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+            const mins = Math.floor(secs / 60);
+            const rem = secs % 60;
+            setElapsed(mins > 0 ? `${mins}m ${rem}s` : `${rem}s`);
+        };
+        update();
+        const id = setInterval(update, 1000);
+        return () => clearInterval(id);
+    }, [startedAt]);
+    return <span className="text-xs text-blue-500/70 font-sans font-mono">{elapsed}</span>;
+}
+
 function formatTime(iso: string): string {
     return new Date(iso).toLocaleString("en-IE", {
         month: "short", day: "numeric",
@@ -46,37 +62,57 @@ function StatusBadge({ status }: { status: string }) {
 
 function ShiftCard({ shift, defaultExpanded }: { shift: CrmShift; defaultExpanded?: boolean }) {
     const [expanded, setExpanded] = useState(defaultExpanded || false);
+    const isRunning = shift.status === "in_progress";
 
     return (
         <Card className="bg-[#F2F2EC] border-transparent overflow-hidden">
             <button
-                onClick={() => setExpanded(!expanded)}
-                className="w-full text-left p-4 flex items-center gap-3 hover:bg-[#EDEDE7] transition-colors"
+                onClick={() => !isRunning && setExpanded(!expanded)}
+                className={`w-full text-left p-4 flex items-center gap-3 transition-colors ${isRunning ? "cursor-default" : "hover:bg-[#EDEDE7]"}`}
             >
-                {expanded
-                    ? <ChevronDown className="w-4 h-4 text-[#0F1016]/40 flex-shrink-0" />
-                    : <ChevronRight className="w-4 h-4 text-[#0F1016]/40 flex-shrink-0" />
-                }
+                {!isRunning && (
+                    expanded
+                        ? <ChevronDown className="w-4 h-4 text-[#0F1016]/40 flex-shrink-0" />
+                        : <ChevronRight className="w-4 h-4 text-[#0F1016]/40 flex-shrink-0" />
+                )}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                         <StatusBadge status={shift.status} />
                         <span className="text-xs text-[#0F1016]/50 font-sans">
                             {formatTime(shift.started_at)}
                         </span>
-                        <span className="text-xs text-[#0F1016]/40 font-sans">
-                            {formatDuration(shift.started_at, shift.completed_at)}
-                        </span>
+                        {isRunning
+                            ? <ElapsedTimer startedAt={shift.started_at} />
+                            : <span className="text-xs text-[#0F1016]/40 font-sans">
+                                {formatDuration(shift.started_at, shift.completed_at)}
+                            </span>
+                        }
                     </div>
-                    <div className="flex gap-4 mt-1 text-xs text-[#0F1016]/60 font-sans">
-                        <span>{shift.threads_processed} threads</span>
-                        <span>{shift.emails_processed} emails</span>
-                        {shift.drafts_created > 0 && <span>{shift.drafts_created} drafts</span>}
-                        {shift.tasks_created > 0 && <span>{shift.tasks_created} tasks</span>}
-                    </div>
+                    {isRunning ? (
+                        <div className="mt-1.5">
+                            <p className="text-xs text-blue-600/70 font-sans italic animate-pulse">
+                                {shift.summary || "Starting shift..."}
+                            </p>
+                            {(shift.threads_processed > 0 || shift.emails_processed > 0) && (
+                                <div className="flex gap-3 mt-1 text-[11px] text-[#0F1016]/40 font-sans">
+                                    <span>{shift.threads_processed} thread{shift.threads_processed !== 1 ? "s" : ""} read</span>
+                                    <span>{shift.emails_processed} email{shift.emails_processed !== 1 ? "s" : ""} read</span>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="flex gap-4 mt-1 text-xs text-[#0F1016]/60 font-sans">
+                            <span>{shift.threads_processed} threads</span>
+                            <span>{shift.emails_processed} emails</span>
+                            {shift.drafts_created > 0 && <span>{shift.drafts_created} drafts</span>}
+                            {shift.tasks_created > 0 && <span>{shift.tasks_created} tasks</span>}
+                            {shift.cost_usd != null && <span className="text-[#0F1016]/40">${shift.cost_usd.toFixed(2)}</span>}
+                        </div>
+                    )}
                 </div>
             </button>
 
-            {expanded && (
+            {!isRunning && expanded && (
                 <div className="px-4 pb-4 border-t border-[#0F1016]/5">
                     {shift.summary && (
                         <pre className="mt-3 text-xs text-[#0F1016]/70 font-sans whitespace-pre-wrap leading-relaxed max-h-[400px] overflow-y-auto">
@@ -92,11 +128,6 @@ function ShiftCard({ shift, defaultExpanded }: { shift: CrmShift; defaultExpande
                                 View shift journal &rarr;
                             </Link>
                         </div>
-                    )}
-                    {!shift.summary && shift.status === "in_progress" && (
-                        <p className="mt-3 text-xs text-[#0F1016]/40 font-sans italic">
-                            Shift is still running...
-                        </p>
                     )}
                 </div>
             )}
@@ -194,6 +225,7 @@ export default function ShiftsPage() {
                 drafts_created: 0,
                 tasks_created: 0,
                 summary: null,
+                cost_usd: null,
                 case_id: null,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
@@ -276,7 +308,7 @@ export default function ShiftsPage() {
                         </h2>
                         <div className="space-y-3">
                             {shifts.map((s, i) => (
-                                <ShiftCard key={s.id} shift={s} defaultExpanded={i === 0 && s.status !== "in_progress"} />
+                                <ShiftCard key={s.id} shift={s} defaultExpanded={i === 0 || s.status === "in_progress"} />
                             ))}
                             {shifts.length === 0 && (
                                 <Card className="bg-[#F2F2EC] border-transparent p-8 text-center">
@@ -300,7 +332,7 @@ export default function ShiftsPage() {
                             <div className="flex items-center gap-2 mb-3">
                                 <Mail className="w-4 h-4 text-[#FF8A00]" />
                                 <span className="text-sm font-sans font-bold text-[#0F1016]">
-                                    {backlogTotal} unread thread{backlogTotal !== 1 ? "s" : ""}
+                                    {backlogTotal} unprocessed thread{backlogTotal !== 1 ? "s" : ""}
                                 </span>
                             </div>
 
@@ -325,7 +357,7 @@ export default function ShiftsPage() {
                                 </div>
                             ) : (
                                 <p className="text-xs text-[#0F1016]/40 font-sans italic">
-                                    All caught up! No unread threads.
+                                    All caught up! No unprocessed threads.
                                 </p>
                             )}
                         </Card>

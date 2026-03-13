@@ -15,7 +15,7 @@ CRM_API_URL = os.environ.get("CRM_API_URL", "http://localhost:8002")
 client = httpx.Client(base_url=CRM_API_URL, timeout=30)
 
 # Order matters: delete children before parents (FK constraints)
-ENTITIES = ["notes", "tasks", "threads", "emails", "cases", "contacts", "properties"]
+ENTITIES = ["notes", "tasks", "shifts", "threads", "emails", "cases", "contacts", "properties"]
 
 
 def delete_all(entity: str):
