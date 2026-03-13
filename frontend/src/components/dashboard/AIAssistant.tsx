@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { MessageSquare, X, Send, Sparkles, ChevronRight, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -16,8 +17,8 @@ interface Message {
 }
 
 interface AIAction {
-    action: "scrollTo" | "expand";
-    target: { type: string; id: string };
+    action: "scrollTo" | "expand" | "navigate";
+    target: { type: string; id?: string };
 }
 
 const WELCOME_MSG: Message = {
@@ -50,9 +51,40 @@ function saveMessages(msgs: Message[]) {
     try { sessionStorage.setItem("lette-chat", JSON.stringify(msgs)); } catch { /* ignore */ }
 }
 
+function saveIsOpen(open: boolean) {
+    try { sessionStorage.setItem("lette-chat-open", open ? "true" : "false"); } catch { /* ignore */ }
+}
+
+/** Map a navigate action target to a URL path. */
+function navigatePath(target: { type: string; id?: string }): string | null {
+    switch (target.type) {
+        case "situation": return target.id ? `/situations/${target.id}` : null;
+        case "dashboard": return "/";
+        case "properties": return "/properties";
+        default: return null;
+    }
+}
+
 export function AIAssistant() {
     const { data: pageData } = usePageData();
-    const [isOpen, setIsOpen] = useState(false);
+    const router = useRouter();
+    const [isOpen, _setIsOpen] = useState(false);
+    const setIsOpen = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+        _setIsOpen(prev => {
+            const next = typeof v === "function" ? v(prev) : v;
+            saveIsOpen(next);
+            return next;
+        });
+    }, []);
+
+    // Restore open state from sessionStorage after hydration
+    useEffect(() => {
+        try {
+            if (sessionStorage.getItem("lette-chat-open") === "true") {
+                _setIsOpen(true);
+            }
+        } catch { /* ignore */ }
+    }, []);
     const [messages, setMessages] = useState<Message[]>(loadMessages);
     const [inputValue, setInputValue] = useState("");
     const [loading, setLoading] = useState(false);
@@ -61,6 +93,27 @@ export function AIAssistant() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const queuedMessage = useRef<string | null>(null);
     const loadingRef = useRef(false);
+    const pageDataRef = useRef(pageData);
+
+    // Keep pageDataRef in sync with latest pageData
+    useEffect(() => { pageDataRef.current = pageData; }, [pageData]);
+
+    /** Wait for page context to change (e.g. after navigation). Resolves with serialized context. */
+    const waitForContextUpdate = useCallback(async (timeoutMs = 8000): Promise<string> => {
+        const startSnapshot = JSON.stringify(pageDataRef.current);
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+            await new Promise(r => setTimeout(r, 200));
+            const current = JSON.stringify(pageDataRef.current);
+            if (current !== startSnapshot && pageDataRef.current) {
+                // Give data a moment to settle (multiple setData calls)
+                await new Promise(r => setTimeout(r, 300));
+                return serializePageContext(pageDataRef.current);
+            }
+        }
+        // Timeout — return whatever we have
+        return serializePageContext(pageDataRef.current);
+    }, []);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -107,6 +160,7 @@ export function AIAssistant() {
     };
 
     const executeAction = (action: AIAction) => {
+        if (action.action === "navigate") return; // navigate handled separately in sendOne
         const selector = `[data-ai-target="${action.target.type}-${action.target.id}"]`;
         const el = document.querySelector(selector);
         if (!el) {
@@ -255,20 +309,71 @@ export function AIAssistant() {
             const body = JSON.stringify({ message: text, context: context || undefined });
             const { response, workerTaskId: wid, action } = await processStream(`${AGENT_URL}/prompt/stream`, body);
 
-            setMessages(prev => [...prev, {
-                id: (Date.now() + 1).toString(),
-                role: "assistant",
-                content: response,
-                timestamp: new Date()
-            }]);
+            if (action?.action === "navigate") {
+                // Navigate action: navigate to new page, wait for context, send follow-up
+                const path = navigatePath(action.target);
+                if (path) {
+                    setStatusText("Navigating...");
+                    setStreamingText("");
+                    console.log("[chat] navigate action → %s", path);
+                    router.push(path);
 
-            if (wid) {
-                setWorkerTaskId(wid);
-            }
+                    // Wait for new page context to load
+                    const newContext = await waitForContextUpdate();
+                    console.log("[chat] new context after navigation (%d chars)", newContext.length);
 
-            // Execute page action after message is rendered
-            if (action) {
-                setTimeout(() => executeAction(action), 100);
+                    // Send follow-up with new context for the AI to answer
+                    const followupBody = JSON.stringify({
+                        message: "[Context update after navigation — answer the user's original question using this new page context. Use page_action scrollTo to highlight the most relevant element.]",
+                        context: newContext || undefined,
+                    });
+                    const followup = await processStream(`${AGENT_URL}/prompt/stream`, followupBody);
+
+                    // Always show a response — use first turn's text as fallback
+                    const finalText = followup.response && followup.response !== "(no response)"
+                        ? followup.response
+                        : response || "I've navigated to the page.";
+
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: "assistant",
+                        content: finalText,
+                        timestamp: new Date()
+                    }]);
+
+                    if (followup.workerTaskId) {
+                        setWorkerTaskId(followup.workerTaskId);
+                    }
+                    // Execute any action from the follow-up (e.g., scrollTo on the new page)
+                    if (followup.action) {
+                        setTimeout(() => executeAction(followup.action!), 100);
+                    }
+                } else {
+                    // Bad navigate target — show the original response
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: "assistant",
+                        content: response,
+                        timestamp: new Date()
+                    }]);
+                }
+            } else {
+                // Non-navigate response — show normally
+                setMessages(prev => [...prev, {
+                    id: (Date.now() + 1).toString(),
+                    role: "assistant",
+                    content: response,
+                    timestamp: new Date()
+                }]);
+
+                if (wid) {
+                    setWorkerTaskId(wid);
+                }
+
+                // Execute page action after message is rendered
+                if (action) {
+                    setTimeout(() => executeAction(action), 100);
+                }
             }
         } catch (err) {
             setMessages(prev => [...prev, {

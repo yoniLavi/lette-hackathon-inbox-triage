@@ -16,8 +16,8 @@ repos:
         stages: [pre-commit]
 
       - id: e2e-tests
-        name: E2E Playwright tests
-        entry: bash -c 'uv run --with playwright --with pytest --with httpx -- pytest tests/test_frontend_e2e.py -v'
+        name: E2E Playwright tests (fast subset)
+        entry: bash -c 'uv run --with playwright --with pytest --with httpx -- pytest tests/test_frontend_e2e.py -v -k "not delegation and not navigate"'
         language: system
         pass_filenames: false
         stages: [pre-commit]

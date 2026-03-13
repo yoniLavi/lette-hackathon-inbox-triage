@@ -30,7 +30,7 @@ export function SituationCard({ crmCase, tier }: { crmCase: CrmCase; tier: Urgen
     return (
         <motion.div layout className="group block">
             <Link href={`/situations/${crmCase.id}`}>
-                <div className="bg-[#F2F2EC] rounded-[20px] p-4 transition-all hover:translate-x-1 border border-transparent hover:border-black/5">
+                <div data-ai-target={`case-${crmCase.id}`} className="bg-[#F2F2EC] rounded-[20px] p-4 transition-all hover:translate-x-1 border border-transparent hover:border-black/5">
                     <div className="flex gap-3">
                         <div className="pt-1.5">
                             <div className={`w-2 h-2 rounded-full ${urgencyStyles[tier].dot}`} />

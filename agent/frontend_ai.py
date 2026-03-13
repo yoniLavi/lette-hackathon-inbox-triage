@@ -53,8 +53,12 @@ TOOLS = [
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["scrollTo", "expand"],
-                    "description": "scrollTo: scroll to and highlight an element. expand: expand a collapsed thread.",
+                    "enum": ["scrollTo", "expand", "navigate"],
+                    "description": (
+                        "scrollTo: scroll to and highlight an element. "
+                        "expand: expand a collapsed thread. "
+                        "navigate: navigate to a different page."
+                    ),
                 },
                 "target": {
                     "type": "object",
@@ -62,15 +66,19 @@ TOOLS = [
                     "properties": {
                         "type": {
                             "type": "string",
-                            "enum": ["email", "thread", "task", "draft", "note"],
-                            "description": "The type of element.",
+                            "enum": ["case", "email", "thread", "task", "draft", "note", "situation", "dashboard", "properties"],
+                            "description": (
+                                "For scrollTo: case (on dashboard), email, thread, task, draft, note (on situation pages). "
+                                "For expand: thread. "
+                                "For navigate: situation (requires id), dashboard, properties."
+                            ),
                         },
                         "id": {
                             "type": "string",
-                            "description": "The element ID (e.g. email id, thread_id, task id).",
+                            "description": "The element ID. Required for scrollTo/expand and navigate to situation.",
                         },
                     },
-                    "required": ["type", "id"],
+                    "required": ["type"],
                 },
             },
             "required": ["action", "target"],

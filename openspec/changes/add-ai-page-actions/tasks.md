@@ -25,7 +25,8 @@
 - [x] 4.1 Verify end-to-end: user asks "show me the draft", AI returns scrollTo action + text response, frontend scrolls and highlights the draft
 - [x] 4.2 Verify context enrichment: user asks "what do you think of this draft?", AI answers from full draft body in page context
 
-### Phase 2: Navigate action (deferred)
-- [ ] 5.1 Add `navigate` action type to protocol
-- [ ] 5.2 Frontend executes navigation via Next.js router
-- [ ] 5.3 Wait for new page context to load, send updated context back to AI for second turn
+### Phase 2: Navigate action
+- [x] 5.1 Add `navigate` action type to protocol (target types: situation, dashboard, properties)
+- [x] 5.2 Frontend executes navigation via Next.js router (`navigatePath` helper + `router.push`)
+- [x] 5.3 Wait for new page context to load (`waitForContextUpdate` polling pageDataRef), send updated context back to AI for second turn via automatic follow-up `/prompt/stream` call
+- [x] 5.4 E2E tests: navigate from dashboard to situation, navigate and verify new page context is used
