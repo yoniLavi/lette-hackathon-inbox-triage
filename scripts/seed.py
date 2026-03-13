@@ -151,64 +151,6 @@ def seed_emails(emails):
     return email_map
 
 
-def seed_cases(emails_data, prop_map, email_map):
-    """Create demo Cases linked to seeded emails."""
-    cases_data = [
-        {
-            "name": "Water Leak - Citynorth Quarter",
-            "priority": "high",
-            "status": "new",
-            "description": "Tenant Eoin Byrne reported a water leak through the bedroom ceiling. "
-                           "Water is actively flowing and damaging property. This is a habitability "
-                           "emergency requiring immediate response.",
-            "property_id": prop_map.get("prop_001"),
-            "thread_id": "thread_001",
-            "tasks": [
-                {"name": "Assign emergency plumber", "priority": "urgent",
-                 "description": "Habitability issue — RTB requires emergency response within 24h."},
-                {"name": "Contact tenant to confirm access", "priority": "normal",
-                 "description": "Ensure someone is available to let the contractor in."},
-            ],
-        },
-        {
-            "name": "Heating Issue - Reds Works",
-            "priority": "normal",
-            "status": "new",
-            "description": "Tenant Emer Crowley reports heating not working for 3 days. "
-                           "Follow-up needed to schedule contractor visit.",
-            "property_id": prop_map.get("prop_002"),
-            "thread_id": "thread_003",
-            "tasks": [
-                {"name": "Schedule heating contractor", "priority": "normal",
-                 "description": "Coordinate with contractor for earliest available slot."},
-            ],
-        },
-    ]
-
-    for case_data in cases_data:
-        thread_id = case_data.pop("thread_id")
-        tasks = case_data.pop("tasks")
-        case = api_post("cases", case_data)
-        case_id = case["id"]
-        print(f"  Case: {case_data['name']} → {case_id}")
-
-        # Link emails from thread to case
-        for challenge_id, crm_id in email_map.items():
-            email_entry = next(
-                (e for e in emails_data if e["id"] == challenge_id and e["thread_id"] == thread_id),
-                None,
-            )
-            if email_entry:
-                client.patch(f"/api/emails/{crm_id}", json={"case_id": case_id})
-
-        # Create tasks
-        for task_data in tasks:
-            task_data["status"] = "not_started"
-            task_data["case_id"] = case_id
-            task = api_post("tasks", task_data)
-            print(f"    Task: {task_data['name']} → {task['id']}")
-
-
 def main():
     data = load_data()
     print("Seeding CRM...\n")
@@ -223,10 +165,7 @@ def main():
     print(f"\nCreated {len(contact_map)} contacts\n")
 
     print("Creating Emails...")
-    email_map = seed_emails(data["emails"])
-
-    print("\nCreating Cases...")
-    seed_cases(data["emails"], prop_map, email_map)
+    seed_emails(data["emails"])
 
     print("\nSeed complete.")
 

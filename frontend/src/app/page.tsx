@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react";
-import { getCases, getCounts, getDraftCount } from "@/lib/crm";
+import Link from "next/link";
+import { getCases, getCounts, getDraftCount, getUnreadThreads } from "@/lib/crm";
 import type { CrmCase } from "@/lib/crm";
 import { caseActionStatus } from "@/lib/crm";
 import { usePageData, buildDashboardContext } from "@/lib/page-context";
@@ -25,6 +26,7 @@ export default function Dashboard() {
     const scrollTriggered = useRef(false);
     const [cases, setCases] = useState<CrmCase[]>([]);
     const [stats, setStats] = useState({ tasks: 0, drafts: 0, closed: 0 });
+    const [unreadCount, setUnreadCount] = useState(0);
     const { setData } = usePageData();
 
     useEffect(() => {
@@ -32,8 +34,10 @@ export default function Dashboard() {
             getCases("emails,tasks,property").catch(() => []),
             getCounts().catch(() => ({ emails: 0, open_tasks: 0, closed_cases: 0 })),
             getDraftCount().catch(() => 0),
-        ]).then(([c, counts, draftCount]) => {
+            getUnreadThreads().catch(() => ({ threads: [], total: 0 })),
+        ]).then(([c, counts, draftCount, unread]) => {
             setCases(c);
+            setUnreadCount(unread.total);
             const s = { tasks: counts.open_tasks, drafts: draftCount, closed: counts.closed_cases };
             setStats(s);
             setData(buildDashboardContext(c, s));
@@ -92,6 +96,25 @@ export default function Dashboard() {
                         <div className="w-px h-12 bg-gradient-to-b from-slate-300 to-transparent" />
                     </motion.div>
                 </header>
+
+                {unreadCount > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-4"
+                    >
+                        <Link href="/shifts" className="block bg-[#0000EE]/5 hover:bg-[#0000EE]/10 border border-[#0000EE]/15 rounded-[16px] px-6 py-4 transition-colors group">
+                            <div className="flex items-center justify-between">
+                                <p className="font-sans text-[14px] text-[#0F1016]/70">
+                                    <span className="font-bold text-[#0000EE]">{unreadCount}</span> unprocessed email thread{unreadCount !== 1 ? "s" : ""} awaiting triage
+                                </p>
+                                <span className="text-[12px] font-sans font-bold uppercase tracking-[0.15em] text-[#0000EE]/60 group-hover:text-[#0000EE] transition-colors">
+                                    Manage Shifts →
+                                </span>
+                            </div>
+                        </Link>
+                    </motion.div>
+                )}
 
                 <div ref={dashboardRef} className="grid grid-cols-1 lg:grid-cols-12 gap-4 pt-4">
                     <div className="lg:col-span-5 flex flex-col gap-4">

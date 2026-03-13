@@ -448,9 +448,13 @@ def test_expand_action_opens_thread(page: Page):
 
 def test_scrollto_case_on_dashboard(page: Page):
     """AI scrollTo action highlights a case card on the dashboard."""
+    ids = _get_case_ids()
+    if not ids:
+        pytest.skip("No cases in CRM — run a shift first")
+
     open_chat(page)
 
-    n = send_message(page, "Show me the sublet request case")
+    n = send_message(page, "Show me the first case")
     wait_for_response(page, timeout=FAST_TIMEOUT, prev_count=n)
 
     # Give action time to execute
