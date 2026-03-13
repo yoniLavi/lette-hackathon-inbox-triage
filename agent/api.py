@@ -384,19 +384,41 @@ async def prompt_stream(req: PromptRequest):
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
-@app.post("/shift")
-async def shift():
-    """Start a batch shift — restart worker session, run /shift skill, return summary."""
-    global _busy
+_CRM_API_URL = "http://crm-api:8002"
 
-    if _busy:
-        raise HTTPException(status_code=409, detail="Agent is busy with another request.")
+# Active shift tracking
+_active_shift_id: int | None = None
 
-    _busy = True
+
+async def _crm_create_shift() -> int:
+    """Create a Shift record in the CRM, return its ID."""
+    import httpx
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{_CRM_API_URL}/api/shifts",
+            json={"status": "in_progress"},
+        )
+        resp.raise_for_status()
+        return resp.json()["id"]
+
+
+async def _crm_update_shift(shift_id: int, data: dict) -> None:
+    """Update a Shift record in the CRM."""
+    import httpx
+    async with httpx.AsyncClient() as client:
+        resp = await client.patch(
+            f"{_CRM_API_URL}/api/shifts/{shift_id}",
+            json=data,
+        )
+        resp.raise_for_status()
+
+
+async def _run_shift_background(shift_id: int) -> None:
+    """Run the shift skill in background, update Shift record on completion."""
+    global _busy, _active_shift_id, _worker_msg_count
     import time as _time
     t0 = _time.monotonic()
     tool_count = 0
-    log.info("[shift] starting — tearing down old worker session")
     try:
         await _teardown_worker()
         client = await _ensure_worker()
@@ -423,31 +445,79 @@ async def shift():
                             log.info("[shift] text: %s%s", snippet,
                                      "…" if len(block.text) > 120 else "")
 
-        global _worker_msg_count
         _worker_msg_count += 1
         elapsed = _time.monotonic() - t0
+        summary = "\n\n".join(text_parts) or "(no response)"
         log.info("[shift] complete — %d tool calls in %.0fs", tool_count, elapsed)
 
-        return {
-            "response": "\n\n".join(text_parts) or "(no response)",
-            "session_id": _worker_session_id or "",
-        }
+        # Parse metrics from summary text (best-effort)
+        metrics = _parse_shift_summary(summary)
+        await _crm_update_shift(shift_id, {
+            "status": "completed",
+            "completed_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+            "summary": summary,
+            **metrics,
+        })
     except TimeoutError:
         elapsed = _time.monotonic() - t0
-        log.error("[shift] timeout after %.0fs (%d tool calls) — no SDK messages for %ds",
-                  elapsed, tool_count, _RESPONSE_TIMEOUT)
+        log.error("[shift] timeout after %.0fs (%d tool calls)", elapsed, tool_count)
         await _teardown_worker()
-        raise HTTPException(status_code=504,
-                            detail=f"Shift timed out after {_RESPONSE_TIMEOUT}s of inactivity.")
-    except HTTPException:
-        raise
+        await _crm_update_shift(shift_id, {
+            "status": "failed",
+            "completed_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+            "summary": f"Timed out after {elapsed:.0f}s ({tool_count} tool calls)",
+        })
     except Exception as exc:
         elapsed = _time.monotonic() - t0
         log.error("[shift] error after %.0fs (%d tool calls): %s", elapsed, tool_count, exc)
         await _teardown_worker()
-        raise HTTPException(status_code=500, detail=str(exc))
+        await _crm_update_shift(shift_id, {
+            "status": "failed",
+            "completed_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+            "summary": f"Error after {elapsed:.0f}s: {exc}",
+        })
     finally:
         _busy = False
+        _active_shift_id = None
+
+
+def _parse_shift_summary(summary: str) -> dict:
+    """Best-effort extraction of metrics from the shift summary text."""
+    import re
+    metrics: dict = {}
+    patterns = {
+        "threads_processed": r"\*\*Threads processed\*\*:\s*(\d+)",
+        "emails_processed": r"\*\*Emails processed\*\*:\s*(\d+)",
+        "drafts_created": r"\*\*Drafts created\*\*:\s*(\d+)",
+        "tasks_created": r"\*\*Tasks created\*\*:\s*(\d+)",
+    }
+    for key, pattern in patterns.items():
+        m = re.search(pattern, summary)
+        if m:
+            metrics[key] = int(m.group(1))
+    return metrics
+
+
+@app.post("/shift")
+async def shift():
+    """Start a batch shift — async. Returns shift_id immediately."""
+    global _busy, _active_shift_id
+
+    if _busy:
+        raise HTTPException(status_code=409, detail="Agent is busy with another request.")
+
+    _busy = True
+    try:
+        shift_id = await _crm_create_shift()
+        _active_shift_id = shift_id
+        log.info("[shift] created shift record %d, starting background processing", shift_id)
+        asyncio.create_task(_run_shift_background(shift_id))
+        return {"shift_id": shift_id}
+    except Exception as exc:
+        _busy = False
+        _active_shift_id = None
+        log.error("[shift] failed to start: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.get("/worker/status")

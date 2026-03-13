@@ -9,7 +9,7 @@ from sqlalchemy import asc, desc, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import engine, get_db, init_db
-from models import Case, Contact, Email, Note, Property, Task, Thread
+from models import Case, Contact, Email, Note, Property, Shift, Task, Thread
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("crm")
@@ -25,6 +25,7 @@ ENTITIES: dict[str, type] = {
     "tasks": Task,
     "notes": Note,
     "threads": Thread,
+    "shifts": Shift,
 }
 
 # Which query-param filters each entity supports
@@ -38,6 +39,7 @@ FILTERS: dict[str, list[str]] = {
     "tasks": ["status", "priority", "case_id", "contact_id"],
     "notes": ["case_id"],
     "threads": ["is_read", "case_id", "property_id", "contact_id"],
+    "shifts": ["status"],
 }
 
 # Which ?include= values each entity supports, and the FK / query to resolve them.
@@ -56,6 +58,9 @@ INCLUDES: dict[str, dict[str, tuple[type, str | None, bool]]] = {
     },
     "emails": {
         "contact": (Contact, None, False),   # special: resolve via from_address
+    },
+    "shifts": {
+        "case": (Case, "case_id", False),
     },
 }
 
@@ -139,7 +144,14 @@ async def _resolve_includes(
                 q = select(target_model).where(target_model.id == fk_val)
                 result = await db.execute(q)
                 related = result.scalar_one_or_none()
-                obj_dict[inc_name] = serialize(related) if related else None
+                if related:
+                    related_dict = serialize(related)
+                    # Special: shifts include=case also loads the case's notes (journal)
+                    if entity == "shifts" and inc_name == "case":
+                        await _resolve_includes(db, "cases", related_dict, ["notes"])
+                    obj_dict[inc_name] = related_dict
+                else:
+                    obj_dict[inc_name] = None
             else:
                 obj_dict[inc_name] = None
     return obj_dict

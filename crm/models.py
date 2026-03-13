@@ -15,6 +15,23 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from database import Base
 
 
+class Shift(Base):
+    __tablename__ = "shifts"
+
+    id = Column(Integer, primary_key=True)
+    started_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True))
+    status = Column(String(20), default="in_progress")  # in_progress / completed / failed
+    threads_processed = Column(Integer, default=0)
+    emails_processed = Column(Integer, default=0)
+    drafts_created = Column(Integer, default=0)
+    tasks_created = Column(Integer, default=0)
+    summary = Column(Text)
+    case_id = Column(Integer, ForeignKey("cases.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class Property(Base):
     __tablename__ = "properties"
 

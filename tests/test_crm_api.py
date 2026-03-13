@@ -452,3 +452,75 @@ def test_property_manager_email(api):
 
     # Clean up
     api.delete(f"/api/properties/{prop['id']}")
+
+
+# ---------------------------------------------------------------------------
+# Shift entity
+# ---------------------------------------------------------------------------
+def test_shift_crud(api):
+    """Shift entity should support standard CRUD operations."""
+    # Create
+    r = api.post("/api/shifts", json={"status": "in_progress"})
+    assert r.status_code == 201
+    shift = r.json()
+    assert shift["status"] == "in_progress"
+    assert shift["threads_processed"] == 0
+    shift_id = shift["id"]
+
+    # Update with metrics
+    r = api.patch(f"/api/shifts/{shift_id}", json={
+        "status": "completed",
+        "threads_processed": 5,
+        "emails_processed": 12,
+        "drafts_created": 3,
+        "tasks_created": 2,
+        "summary": "Processed 5 threads.",
+    })
+    assert r.status_code == 200
+    updated = r.json()
+    assert updated["status"] == "completed"
+    assert updated["threads_processed"] == 5
+
+    # List
+    r = api.get("/api/shifts", params={"order_by": "started_at", "order": "desc"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total"] >= 1
+    assert any(s["id"] == shift_id for s in data["list"])
+
+    # Clean up
+    api.delete(f"/api/shifts/{shift_id}")
+
+
+def test_shift_include_case(api):
+    """GET /api/shifts/{id}?include=case should return nested case with notes."""
+    # Create case with a note
+    case = api.post("/api/cases", json={
+        "name": "Shift journal test",
+        "status": "in_progress",
+    }).json()
+    note = api.post("/api/notes", json={
+        "content": "Thread 1: processed",
+        "case_id": case["id"],
+    }).json()
+
+    # Create shift linked to case
+    shift = api.post("/api/shifts", json={
+        "status": "completed",
+        "case_id": case["id"],
+        "summary": "Test shift",
+    }).json()
+
+    # Get with include=case
+    r = api.get(f"/api/shifts/{shift['id']}", params={"include": "case"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["case"] is not None
+    assert data["case"]["id"] == case["id"]
+    assert "notes" in data["case"]
+    assert any(n["id"] == note["id"] for n in data["case"]["notes"])
+
+    # Clean up
+    api.delete(f"/api/shifts/{shift['id']}")
+    api.delete(f"/api/notes/{note['id']}")
+    api.delete(f"/api/cases/{case['id']}")

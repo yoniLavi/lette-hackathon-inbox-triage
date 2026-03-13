@@ -45,6 +45,12 @@ Supported includes:
 - **threads**: `emails`, `contact`
 - **emails**: `contact` (resolved from `from_address`)
 
+### Shift records
+```bash
+crm shifts list --status in_progress --limit 1 --order-by started_at --order desc
+crm shifts update 1 --json '{"case_id": 5, "threads_processed": 3, "emails_processed": 12}'
+```
+
 ### Shift commands (thread-based processing)
 ```bash
 # Get next unread thread with full case context (thread + emails + contact + case + tasks + notes + property)
@@ -97,6 +103,13 @@ crm emails delete 42
 ```
 
 ## Entity fields
+
+### Shift (batch processing record)
+- `started_at`, `completed_at` — timestamps
+- `status` — in_progress / completed / failed
+- `threads_processed`, `emails_processed`, `drafts_created`, `tasks_created` — metrics
+- `summary` — text summary of the shift
+- `case_id` — FK to the journal Case
 
 ### Thread (derived entity — auto-maintained from emails)
 - `thread_id` — unique string matching Email.thread_id

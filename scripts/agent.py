@@ -31,9 +31,10 @@ def main():
         return
 
     if len(sys.argv) > 1 and sys.argv[1] == "--shift":
+        import time
         print("Starting shift (batch email processing)...")
         try:
-            resp = httpx.post(f"{AGENT_URL}/shift", timeout=600.0)
+            resp = httpx.post(f"{AGENT_URL}/shift", timeout=30.0)
         except httpx.ConnectError:
             print("Error: cannot connect to agent API at", AGENT_URL, file=sys.stderr)
             print("Is the agent running? Try: docker compose up -d", file=sys.stderr)
@@ -42,7 +43,26 @@ def main():
             print("Error: agent is busy with another request", file=sys.stderr)
             sys.exit(1)
         resp.raise_for_status()
-        print(resp.json()["response"])
+        shift_id = resp.json()["shift_id"]
+        print(f"Shift {shift_id} started. Polling for completion...")
+
+        crm_url = "http://localhost:8002"
+        while True:
+            time.sleep(3)
+            try:
+                status_resp = httpx.get(f"{crm_url}/api/shifts/{shift_id}", timeout=10.0)
+                status_resp.raise_for_status()
+                shift_data = status_resp.json()
+                status = shift_data.get("status", "unknown")
+                if status in ("completed", "failed"):
+                    print(f"\nShift {status}.")
+                    if shift_data.get("summary"):
+                        print(shift_data["summary"])
+                    break
+                print(".", end="", flush=True)
+            except Exception as e:
+                print(f"\nPolling error: {e}", file=sys.stderr)
+                break
         return
 
     if len(sys.argv) > 1 and sys.argv[1] == "--status":

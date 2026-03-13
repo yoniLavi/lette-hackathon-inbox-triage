@@ -126,6 +126,23 @@ export interface CrmThread {
     contact?: CrmContact | null;
 }
 
+export interface CrmShift {
+    id: number;
+    started_at: string;
+    completed_at: string | null;
+    status: string; // in_progress / completed / failed
+    threads_processed: number;
+    emails_processed: number;
+    drafts_created: number;
+    tasks_created: number;
+    summary: string | null;
+    case_id: number | null;
+    created_at: string;
+    updated_at: string;
+    // Populated via ?include=
+    case?: CrmCase | null;
+}
+
 async function crmPatch(path: string, body: Record<string, unknown>) {
     const url = new URL("/api/crm", window.location.origin);
     url.searchParams.set("path", path);
@@ -261,6 +278,33 @@ export async function getThreads(include?: string): Promise<CrmThread[]> {
     if (include) params.include = include;
     const data = await crmFetch("threads", params);
     return data.list || [];
+}
+
+export async function getShifts(params?: Record<string, string>): Promise<CrmShift[]> {
+    const data = await crmFetch("shifts", {
+        order_by: "started_at",
+        order: "desc",
+        limit: "50",
+        ...params,
+    });
+    return data.list || [];
+}
+
+export async function getShift(id: number, include?: string): Promise<CrmShift> {
+    const params: Record<string, string> = {};
+    if (include) params.include = include;
+    return crmFetch(`shifts/${id}`, params);
+}
+
+export async function getUnreadThreads(): Promise<{ threads: CrmThread[]; total: number }> {
+    const data = await crmFetch("threads", {
+        is_read: "false",
+        order_by: "last_activity_at",
+        order: "asc",
+        limit: "50",
+        include: "contact",
+    });
+    return { threads: data.list || [], total: data.total || 0 };
 }
 
 export async function getCounts(): Promise<{ emails: number; open_tasks: number; closed_cases: number }> {

@@ -8,12 +8,21 @@ Process unread email threads in the CRM as a batch shift.
    ```
    Save the Case ID — you'll add Notes to it throughout the shift.
 
-2. Track the current case ID (from the thread's case context, not the shift case). This
+2. Link the Case to the Shift record. Find the latest in-progress shift and update it:
+   ```bash
+   crm shifts list --status in_progress --limit 1 --order-by started_at --order desc
+   ```
+   Then update it with the case_id:
+   ```bash
+   crm shifts update <shift_id> --json '{"case_id": <case_id>}'
+   ```
+
+3. Track the current case ID (from the thread's case context, not the shift case). This
    determines when you've switched to a new case and should check context usage.
 
 ## Main loop
 
-3. Fetch the next unread thread:
+4. Fetch the next unread thread:
    ```bash
    crm shift next
    ```
@@ -22,7 +31,7 @@ Process unread email threads in the CRM as a batch shift.
    - `case`: the linked case (if any) with `emails[]`, `tasks[]`, `notes[]`, `property` pre-loaded
    - If `thread` is `null`, there are no more unread threads — skip to Wrap Up.
 
-4. For each thread, do the following:
+5. For each thread, do the following:
 
 ### a) Assess the situation
    - Read all emails in `thread.emails` (they're ordered by thread_position).
@@ -83,16 +92,16 @@ Process unread email threads in the CRM as a batch shift.
    - If you discover something useful about CRM patterns, entity relationships, efficient search strategies, or domain knowledge, **append it to `/workspace/learnings.md`**.
    - Don't repeat insights already in the file — read it first.
 
-5. Loop back to step 3.
+6. Loop back to step 4.
 
 ## Wrap up
 
-6. Update the shift Case:
+7. Update the shift Case:
    ```bash
    crm cases update <shift_case_id> --json '{"status": "closed", "description": "Processed <N> threads (<M> emails). <brief summary>."}'
    ```
 
-7. Produce a final summary in this format:
+8. Produce a final summary in this format:
 
 ```
 ## Shift Complete
