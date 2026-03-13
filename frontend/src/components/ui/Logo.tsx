@@ -22,7 +22,7 @@ export function Logo({ className = "" }: LogoProps) {
                     Give(a)Lette
                 </span>
                 <span className="text-[9px] font-sans font-bold uppercase tracking-[0.15em] text-[#0F1016]/40 leading-tight">
-                    Give(a)Go Hackathon 2026
+                    Give(a)Go Hackathon project
                 </span>
             </div>
         </Link>
