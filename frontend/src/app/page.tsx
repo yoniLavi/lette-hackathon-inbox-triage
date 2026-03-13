@@ -74,9 +74,6 @@ export default function Dashboard() {
 
             <main className="flex-1 w-full max-w-[1440px] mx-auto px-4 md:px-8 pb-16">
                 <header className="min-h-[50vh] flex flex-col items-center justify-center text-center py-12">
-                    <div className="inline-flex items-center gap-2 bg-[#0F1016]/5 text-[#0F1016]/60 px-4 py-1.5 rounded-full text-[11px] font-sans font-bold uppercase tracking-[0.2em] mb-8 border border-[#0F1016]/10">
-                        Intelligence Operations
-                    </div>
                     <h2 className="text-[10vw] md:text-[64px] leading-[0.95] font-serif font-medium text-[#0F1016] tracking-tight mb-6 max-w-3xl">
                         Morning, Maria. <br /><span className="text-[#0F1016]/30">Your day at a glance.</span>
                     </h2>

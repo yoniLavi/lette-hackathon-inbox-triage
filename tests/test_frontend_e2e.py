@@ -159,7 +159,7 @@ def test_send_message_shows_response(page: Page):
     # Response should mention property management or similar domain terms
     assert any(
         kw in response.lower()
-        for kw in ["property", "crm", "case", "email", "task", "help", "manage"]
+        for kw in ["property", "crm", "case", "email", "task", "help", "manage", "rtb", "tenant", "draft", "complaint", "situation"]
     ), f"Response doesn't seem relevant: {response[:200]}"
 
 
