@@ -145,10 +145,10 @@ The agent API SHALL expose an endpoint that triggers batch processing of active 
 - **THEN** it appends the insight to `learnings.md` in its workspace
 
 ### Requirement: Two-Layer AI Architecture
-The agent SHALL run two AI sessions: a Frontend AI (direct Anthropic/Bedrock API, user-facing, with delegation tools) and a Worker AI (Claude Code SDK session with crm CLI access). The Frontend AI SHALL never block on CRM operations.
+The agent SHALL run two AI sessions: a Frontend AI (direct Anthropic/Bedrock API, user-facing, with delegation and page action tools) and a Worker AI (Claude Code SDK session with crm CLI access). The Frontend AI SHALL never block on CRM operations. The Frontend AI MAY return at most one UI action per response to control page elements.
 
 #### Scenario: Frontend AI responds instantly from page context
-- **WHEN** a user asks about data already in the page context (e.g., "what's the status of this case?")
+- **WHEN** a user asks about data already in the page context (e.g., "what's the status of this case?" or "what do you think of this draft?")
 - **THEN** the Frontend AI answers directly from context within 3 seconds
 - **AND** no delegation to the Worker occurs
 
@@ -159,6 +159,17 @@ The agent SHALL run two AI sessions: a Frontend AI (direct Anthropic/Bedrock API
 - **AND** the SSE stream closes immediately — the user can continue chatting
 - **AND** the worker result is delivered via `GET /worker/status` polling
 - **AND** the worker result is injected into conversation history for follow-up context
+
+#### Scenario: Frontend AI triggers page action
+- **WHEN** the user asks to find, show, or focus on a specific element (e.g., "show me the draft" or "find the email about the leak")
+- **THEN** the Frontend AI calls `page_action` with the appropriate action type and target
+- **AND** the action is emitted as an `event: action` SSE event before the `done` event
+- **AND** the Frontend AI's text response acknowledges the action naturally (e.g., "Here's the draft — ..." rather than "I'm using page_action to scroll to...")
+
+#### Scenario: At most one action per turn
+- **WHEN** the Frontend AI processes a user message
+- **THEN** it calls `page_action` at most once per turn
+- **AND** may combine the action with a text response but not with a delegation
 
 #### Scenario: User chats during worker execution
 - **WHEN** a worker task is running in the background
@@ -197,7 +208,13 @@ The Worker AI SHALL be the existing Claude Code SDK session with crm CLI access,
 - **AND** the response is stored and made available via `GET /worker/status` polling
 
 ### Requirement: SSE Streaming (Non-Blocking)
-The `/prompt/stream` endpoint SHALL stream SSE events for the Frontend AI response only, then close immediately. Worker results are delivered separately via polling.
+The `/prompt/stream` endpoint SHALL stream SSE events for the Frontend AI response only, then close immediately. Worker results are delivered separately via polling. UI actions are delivered as `event: action` SSE events.
+
+#### Scenario: Stream with action event
+- **WHEN** the Frontend AI returns a page action
+- **THEN** the SSE stream emits `event: action` with `{"action": "scrollTo"|"expand", "target": {"type": "...", "id": "..."}}`
+- **AND** emits the `done` event with the text response
+- **AND** the stream closes
 
 #### Scenario: Stream closes after acknowledgment
 - **WHEN** the Frontend AI delegates to the Worker
