@@ -492,35 +492,28 @@ def test_shift_crud(api):
     api.delete(f"/api/shifts/{shift_id}")
 
 
-def test_shift_include_case(api):
-    """GET /api/shifts/{id}?include=case should return nested case with notes."""
-    # Create case with a note
-    case = api.post("/api/cases", json={
-        "name": "Shift journal test",
-        "status": "in_progress",
-    }).json()
-    note = api.post("/api/notes", json={
-        "content": "Thread 1: processed",
-        "case_id": case["id"],
-    }).json()
-
-    # Create shift linked to case
+def test_shift_include_notes(api):
+    """GET /api/shifts/{id}?include=notes should return journal notes via shift_id."""
+    # Create shift
     shift = api.post("/api/shifts", json={
         "status": "completed",
-        "case_id": case["id"],
         "summary": "Test shift",
     }).json()
 
-    # Get with include=case
-    r = api.get(f"/api/shifts/{shift['id']}", params={"include": "case"})
+    # Create note linked to shift via shift_id
+    note = api.post("/api/notes", json={
+        "content": "Thread 1: processed",
+        "shift_id": shift["id"],
+    }).json()
+
+    # Get with include=notes
+    r = api.get(f"/api/shifts/{shift['id']}", params={"include": "notes"})
     assert r.status_code == 200
     data = r.json()
-    assert data["case"] is not None
-    assert data["case"]["id"] == case["id"]
-    assert "notes" in data["case"]
-    assert any(n["id"] == note["id"] for n in data["case"]["notes"])
+    assert "notes" in data
+    assert any(n["id"] == note["id"] for n in data["notes"])
+    assert data["notes"][0]["shift_id"] == shift["id"]
 
     # Clean up
-    api.delete(f"/api/shifts/{shift['id']}")
     api.delete(f"/api/notes/{note['id']}")
-    api.delete(f"/api/cases/{case['id']}")
+    api.delete(f"/api/shifts/{shift['id']}")

@@ -83,16 +83,15 @@ function ShiftCard({ shift, defaultExpanded }: { shift: CrmShift; defaultExpande
     const fetchCases = useCallback(async () => {
         const after = shift.started_at;
         const before = shift.completed_at || new Date().toISOString();
-        const journalId = shift.case_id;
+        const isRealCase = (c: CrmCase) => !c.name.startsWith("Agent Shift");
         const [created, updated] = await Promise.all([
             getCasesCreatedDuring(after, before).catch(() => []),
             getCasesUpdatedDuring(after, before).catch(() => []),
         ]);
-        // Filter out the shift journal case
-        const filteredCreated = created.filter(c => c.id !== journalId);
-        // Updated = modified during shift but NOT created during shift (and not journal)
+        const filteredCreated = created.filter(isRealCase);
+        // Updated = modified during shift but NOT created during shift
         const createdIds = new Set(created.map(c => c.id));
-        const filteredUpdated = updated.filter(c => c.id !== journalId && !createdIds.has(c.id));
+        const filteredUpdated = updated.filter(c => isRealCase(c) && !createdIds.has(c.id));
         setCreatedCases(filteredCreated);
         setUpdatedCases(filteredUpdated);
         setCasesLoaded(true);
@@ -213,15 +212,20 @@ function ShiftCard({ shift, defaultExpanded }: { shift: CrmShift; defaultExpande
                             {shift.summary}
                         </pre>
                     )}
-                    {shift.case_id && (
-                        <div className="mt-3">
-                            <Link
-                                href={`/situations/${shift.case_id}`}
-                                className="text-xs text-[#0000EE] hover:underline font-sans font-bold"
-                            >
-                                View shift journal &rarr;
-                            </Link>
-                        </div>
+                    {(shift.notes?.length ?? 0) > 0 && (
+                        <details className="mt-3">
+                            <summary className="text-[10px] font-sans font-bold uppercase tracking-[0.15em] text-[#0F1016]/50 cursor-pointer hover:text-[#0000EE] transition-colors">
+                                {shift.notes!.length} journal entr{shift.notes!.length !== 1 ? "ies" : "y"}
+                            </summary>
+                            <div className="mt-2 space-y-2 max-h-[400px] overflow-y-auto">
+                                {shift.notes!.map(note => (
+                                    <div key={note.id} className="text-xs font-sans text-[#0F1016]/70 bg-white/50 rounded-lg p-2.5">
+                                        <span className="text-[10px] text-[#0F1016]/40">{formatTime(note.created_at)}</span>
+                                        <p className="mt-0.5 whitespace-pre-wrap">{note.content}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </details>
                     )}
                 </div>
             )}

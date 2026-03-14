@@ -105,6 +105,7 @@ export interface CrmNote {
     id: number;
     content: string;
     case_id?: number;
+    shift_id?: number;
     created_at: string;
     updated_at: string;
 }
@@ -143,6 +144,7 @@ export interface CrmShift {
     updated_at: string;
     // Populated via ?include=
     case?: CrmCase | null;
+    notes?: CrmNote[];
 }
 
 async function crmPatch(path: string, body: Record<string, unknown>) {
@@ -311,6 +313,7 @@ export async function getShifts(params?: Record<string, string>): Promise<CrmShi
         order_by: "started_at",
         order: "desc",
         limit: "50",
+        include: "notes",
         ...params,
     });
     return data.list || [];

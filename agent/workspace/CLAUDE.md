@@ -44,11 +44,12 @@ Supported includes:
 - **cases**: `emails`, `tasks`, `notes`, `property`
 - **threads**: `emails`, `contact`
 - **emails**: `contact` (resolved from `from_address`)
+- **shifts**: `case`, `notes` (journal notes linked via shift_id)
 
 ### Shift records
 ```bash
 crm shifts list --status in_progress --limit 1 --order-by started_at --order desc
-crm shifts update 1 --json '{"case_id": 5, "threads_processed": 3, "emails_processed": 12}'
+crm shifts update 1 --json '{"threads_processed": 3, "emails_processed": 12}'
 ```
 
 ### Shift commands (thread-based processing)
@@ -58,6 +59,9 @@ crm shift next
 
 # Mark thread as processed: batch-mark emails read, link to case
 crm shift complete --json '{"email_ids": [1,2,3], "thread_id": "thread_001", "case_id": 5}'
+
+# Get cases needing triage (new/in_progress with no tasks and no drafts)
+crm shift incomplete
 ```
 
 `crm shift next` returns:
@@ -86,9 +90,9 @@ crm emails bulk-update --json '{"ids": [1,2,3], "updates": {"is_read": true}}'
 ### Create entities
 ```bash
 crm emails create --json '{"subject": "Re: Water leak", "body": "Draft reply...", "status": "draft", "from_address": "manager@manageco.ie", "to_addresses": ["tenant@gmail.com"], "thread_id": "thread_001", "case_id": 5}'
-crm cases create --json '{"name": "Agent Shift — 2026-03-08", "status": "in_progress", "priority": "normal"}'
 crm tasks create --json '{"name": "Assign emergency plumber", "status": "not_started", "priority": "urgent", "case_id": 3, "description": "..."}'
 crm notes create --json '{"content": "**Water Leak** (from Eoin Byrne) — Emergency. Drafted reply, created task.", "case_id": 3}'
+crm notes create --json '{"content": "**Thread: Water leak** — Emergency. Created case, drafted reply.", "shift_id": 5}'
 ```
 
 ### Update entities
@@ -109,7 +113,9 @@ crm emails delete 42
 - `status` — in_progress / completed / failed
 - `threads_processed`, `emails_processed`, `drafts_created`, `tasks_created` — metrics
 - `summary` — text summary of the shift
-- `case_id` — FK to the journal Case
+- `cost_usd` — inference cost
+- `current_thread_id` — thread being processed (set by agent API)
+- `notes` — journal notes (via `?include=notes`)
 
 ### Thread (derived entity — auto-maintained from emails)
 - `thread_id` — unique string matching Email.thread_id
@@ -143,7 +149,7 @@ crm emails delete 42
 - `description`, `date_start`, `date_end`, `case_id`, `contact_id`
 
 ### Note
-- `content` (markdown), `case_id`
+- `content` (markdown), `case_id`, `shift_id`
 
 ### Property
 - `name`, `type` (BTR/PRS), `units`, `manager`, `manager_email`, `description`
@@ -200,9 +206,11 @@ When creating Tasks:
 
 ## Shift journaling
 
-During a `/shift` run, you create a Case to journal your work:
-- One Note per processed thread, summarizing what you found and what actions you took.
-- Close the Case with a final summary when the shift is done.
+During a `/shift` run, journal your work directly to the shift record:
+- One Note per processed thread, linked via `shift_id` (not `case_id`).
+- Each note summarizes what you found and what actions you took.
+- Example: `crm notes create --json '{"content": "**Thread: ...** — ...", "shift_id": <shift_id>}'`
+- Do NOT create an "Agent Shift" case — use the shift record directly.
 
 ## Learnings file
 

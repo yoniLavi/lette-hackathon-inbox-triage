@@ -2,23 +2,30 @@ Process unread email threads in the CRM as a batch shift.
 
 ## Setup
 
-1. Create a Case for this shift:
-   ```bash
-   crm cases create --json '{"name": "Agent Shift — <today's date and time>", "status": "in_progress", "priority": "normal"}'
-   ```
-   Save the Case ID — you'll add Notes to it throughout the shift.
-
-2. Link the Case to the Shift record. Find the latest in-progress shift and update it:
+1. Find the current in-progress shift record:
    ```bash
    crm shifts list --status in_progress --limit 1 --order-by started_at --order desc
    ```
-   Then update it with the case_id:
-   ```bash
-   crm shifts update <shift_id> --json '{"case_id": <case_id>}'
-   ```
+   Save the **shift ID** — you'll journal notes to it throughout the shift.
 
-3. Track the current case ID (from the thread's case context, not the shift case). This
+2. Track the current case ID (from the thread's case context). This
    determines when you've switched to a new case and should check context usage.
+
+## Incomplete cases
+
+3. Check for cases from previous shifts that need attention:
+   ```bash
+   crm shift incomplete
+   ```
+   This returns cases that are new/in_progress but have no tasks and no draft emails.
+   If there are incomplete cases, process them FIRST before fetching new threads:
+   - For each incomplete case, load it with full context:
+     ```bash
+     crm cases get <id> --include emails,tasks,notes,property
+     ```
+   - Triage the case: assess urgency, create tasks, draft replies as needed (see step 5b).
+   - Journal each triaged case as a note to the shift (see step 5d).
+   - Then proceed to step 4 (main loop for new threads).
 
 ## Main loop
 
@@ -74,9 +81,9 @@ Process unread email threads in the CRM as a batch shift.
    crm shift complete --json '{"email_ids": [<ids from thread.emails>], "thread_id": "<thread_id>", "case_id": <case_id>}'
    ```
 
-### d) Journal to the shift Case
+### d) Journal to the shift
    ```bash
-   crm notes create --json '{"content": "**Thread: <subject>** (<email_count> emails, from <contact>) — <urgency>. Actions: <what you did>.", "case_id": <shift_case_id>}'
+   crm notes create --json '{"content": "**Thread: <subject>** (<email_count> emails, from <contact>) — <urgency>. Actions: <what you did>.", "shift_id": <shift_id>}'
    ```
 
 ### e) Pacing: check before starting a new case
@@ -96,12 +103,7 @@ Process unread email threads in the CRM as a batch shift.
 
 ## Wrap up
 
-7. Update the shift Case:
-   ```bash
-   crm cases update <shift_case_id> --json '{"status": "closed", "description": "Processed <N> threads (<M> emails). <brief summary>."}'
-   ```
-
-8. Produce a final summary in this format:
+7. Produce a final summary in this format:
 
 ```
 ## Shift Complete

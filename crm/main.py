@@ -37,7 +37,7 @@ FILTERS: dict[str, list[str]] = {
     ],
     "cases": ["status", "priority", "property_id"],
     "tasks": ["status", "priority", "case_id", "contact_id"],
-    "notes": ["case_id"],
+    "notes": ["case_id", "shift_id"],
     "threads": ["is_read", "case_id", "property_id", "contact_id"],
     "shifts": ["status"],
 }
@@ -61,6 +61,7 @@ INCLUDES: dict[str, dict[str, tuple[type, str | None, bool]]] = {
     },
     "shifts": {
         "case": (Case, "case_id", False),
+        "notes": (Note, None, True),  # Note.shift_id → Shift.id
     },
 }
 
@@ -131,6 +132,15 @@ async def _resolve_includes(
                 obj_dict[inc_name] = serialize(contact) if contact else None
             else:
                 obj_dict[inc_name] = None
+        elif entity == "shifts" and inc_name == "notes":
+            # Special: notes linked via shift_id, ordered chronologically
+            q = (
+                select(target_model)
+                .where(target_model.shift_id == obj_dict["id"])
+                .order_by(asc(target_model.created_at))
+            )
+            result = await db.execute(q)
+            obj_dict[inc_name] = [serialize(r) for r in result.scalars().all()]
         elif is_list:
             # Reverse FK: target has a case_id/property_id pointing at this entity
             fk_col = getattr(target_model, "case_id", None)
@@ -145,11 +155,7 @@ async def _resolve_includes(
                 result = await db.execute(q)
                 related = result.scalar_one_or_none()
                 if related:
-                    related_dict = serialize(related)
-                    # Special: shifts include=case also loads the case's notes (journal)
-                    if entity == "shifts" and inc_name == "case":
-                        await _resolve_includes(db, "cases", related_dict, ["notes"])
-                    obj_dict[inc_name] = related_dict
+                    obj_dict[inc_name] = serialize(related)
                 else:
                     obj_dict[inc_name] = None
             else:
@@ -368,6 +374,40 @@ async def shift_complete(request: Request, db: AsyncSession = Depends(get_db)):
 
     log.info("Shift complete: marked %d emails read, thread=%s case=%s", updated, thread_id_str, case_id)
     return {"emails_updated": updated}
+
+
+@app.get("/api/shift/incomplete")
+async def shift_incomplete(db: AsyncSession = Depends(get_db)):
+    """Return cases that need triage: new/in_progress with no tasks and no draft emails."""
+    from sqlalchemy import exists
+
+    has_tasks = exists(select(Task.id).where(Task.case_id == Case.id))
+    has_drafts = exists(
+        select(Email.id).where(Email.case_id == Case.id, Email.status == "draft")
+    )
+
+    q = (
+        select(Case)
+        .where(
+            Case.status.in_(["new", "in_progress"]),
+            ~has_tasks,
+            ~has_drafts,
+            # Exclude shift journal cases
+            ~Case.name.startswith("Agent Shift"),
+        )
+        .order_by(asc(Case.created_at))
+    )
+    result = await db.execute(q)
+    cases = result.scalars().all()
+
+    # Resolve includes for each case
+    items = []
+    for c in cases:
+        d = serialize(c)
+        await _resolve_includes(db, "cases", d, ["emails", "notes", "property"])
+        items.append(d)
+
+    return {"list": items, "total": len(items)}
 
 
 # ---------------------------------------------------------------------------

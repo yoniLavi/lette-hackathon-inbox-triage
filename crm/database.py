@@ -56,3 +56,9 @@ async def init_db():
                 "ALTER TABLE shifts ADD COLUMN IF NOT EXISTS current_thread_id INTEGER"
             )
         )
+        # Add shift_id column to notes if missing
+        await conn.execute(
+            text(
+                "ALTER TABLE notes ADD COLUMN IF NOT EXISTS shift_id INTEGER REFERENCES shifts(id)"
+            )
+        )

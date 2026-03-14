@@ -126,7 +126,7 @@ def _add_entity_commands(entity_name: str):
         _output(_request("DELETE", f"{entity_name}/{item_id}"))
 
 
-for _entity in ["properties", "contacts", "emails", "cases", "tasks", "notes", "threads"]:
+for _entity in ["properties", "contacts", "emails", "cases", "tasks", "notes", "threads", "shifts"]:
     _add_entity_commands(_entity)
 
 
@@ -154,6 +154,12 @@ def shift_complete(json_str):
         click.echo(f"Error: invalid JSON: {e}", err=True)
         sys.exit(1)
     _output(_request("POST", "shift/complete", json=data))
+
+
+@shift_group.command("incomplete")
+def shift_incomplete():
+    """Get cases needing triage: new/in_progress with no tasks and no drafts."""
+    _output(_request("GET", "shift/incomplete"))
 
 
 # ---------------------------------------------------------------------------
