@@ -11,7 +11,11 @@ import { SituationCard } from "@/components/dashboard/SituationCard";
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:8001";
 
 function formatDuration(startedAt: string, completedAt: string | null, status?: string): string {
-    if (!completedAt) return status === "failed" ? "interrupted" : "running...";
+    if (!completedAt) {
+        if (status === "failed") return "interrupted";
+        if (status === "completed") return "";
+        return "running...";
+    }
     const ms = new Date(completedAt).getTime() - new Date(startedAt).getTime();
     const secs = Math.floor(ms / 1000);
     if (secs < 60) return `${secs}s`;
