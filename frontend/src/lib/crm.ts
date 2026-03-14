@@ -137,6 +137,7 @@ export interface CrmShift {
     tasks_created: number;
     summary: string | null;
     cost_usd: number | null;
+    current_thread_id: number | null;
     case_id: number | null;
     created_at: string;
     updated_at: string;
@@ -180,6 +181,30 @@ export async function getCases(include?: string): Promise<CrmCase[]> {
     };
     if (include) params.include = include;
     const data = await crmFetch("cases", params);
+    return data.list || [];
+}
+
+export async function getCasesCreatedDuring(after: string, before: string): Promise<CrmCase[]> {
+    const data = await crmFetch("cases", {
+        created_at_after: after,
+        created_at_before: before,
+        order_by: "created_at",
+        order: "asc",
+        limit: "50",
+        include: "emails,tasks,notes,property",
+    });
+    return data.list || [];
+}
+
+export async function getCasesUpdatedDuring(after: string, before: string): Promise<CrmCase[]> {
+    const data = await crmFetch("cases", {
+        updated_at_after: after,
+        updated_at_before: before,
+        order_by: "updated_at",
+        order: "asc",
+        limit: "50",
+        include: "emails,tasks,notes,property",
+    });
     return data.list || [];
 }
 
@@ -302,7 +327,7 @@ export async function getUnreadThreads(): Promise<{ threads: CrmThread[]; total:
         is_read: "false",
         order_by: "last_activity_at",
         order: "asc",
-        limit: "50",
+        limit: "200",
         include: "contact",
     });
     return { threads: data.list || [], total: data.total || 0 };

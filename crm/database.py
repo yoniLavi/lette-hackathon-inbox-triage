@@ -50,3 +50,9 @@ async def init_db():
                 "ALTER TABLE shifts ADD COLUMN IF NOT EXISTS cost_usd DOUBLE PRECISION"
             )
         )
+        # Add current_thread_id column to shifts if missing
+        await conn.execute(
+            text(
+                "ALTER TABLE shifts ADD COLUMN IF NOT EXISTS current_thread_id INTEGER"
+            )
+        )

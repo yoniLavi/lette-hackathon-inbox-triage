@@ -453,7 +453,7 @@ async def list_entities(
 
     # Date range filters: ?date_end_before=2026-03-20&date_end_after=2026-03-10
     for suffix, op in [("_before", "<="), ("_after", ">=")]:
-        for date_field in ["date_end", "date_start", "date_sent"]:
+        for date_field in ["date_end", "date_start", "date_sent", "created_at", "updated_at"]:
             param_name = f"{date_field}{suffix}"
             val = request.query_params.get(param_name)
             if val is not None:

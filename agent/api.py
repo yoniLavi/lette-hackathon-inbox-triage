@@ -41,6 +41,7 @@ from frontend_ai import FrontendAI
 WORKER_OPTIONS = ClaudeCodeOptions(
     cwd="/workspace",
     permission_mode="bypassPermissions",
+    max_turns=200,
 )
 
 FRONTEND_SYSTEM_PROMPT = """\
@@ -106,7 +107,8 @@ FRONTEND_MODEL = "eu.anthropic.claude-sonnet-4-20250514-v1:0"
 # ---------------------------------------------------------------------------
 # Session state
 # ---------------------------------------------------------------------------
-_RESPONSE_TIMEOUT = 300  # seconds per message
+_RESPONSE_TIMEOUT = 300  # seconds per message (chat/worker)
+_SHIFT_MSG_TIMEOUT = 600  # seconds per message during shifts (model needs more time in large contexts)
 
 # Worker AI (Claude Code SDK)
 _worker_client: ClaudeSDKClient | None = None
@@ -204,8 +206,33 @@ async def _background_worker_complete(task_id: str) -> None:
 # ---------------------------------------------------------------------------
 # App lifecycle
 # ---------------------------------------------------------------------------
+async def _recover_orphaned_shifts():
+    """Mark any in_progress shifts as failed on startup (they were interrupted)."""
+    import httpx
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{_CRM_API_URL}/api/shifts",
+                params={"status": "in_progress", "limit": "10"},
+            )
+            if resp.status_code == 200:
+                orphans = resp.json().get("list", [])
+                for shift in orphans:
+                    sid = shift["id"]
+                    log.warning("[startup] marking orphaned shift %d as failed", sid)
+                    await client.patch(
+                        f"{_CRM_API_URL}/api/shifts/{sid}",
+                        json={"status": "failed", "summary": "Shift interrupted (agent restarted)"},
+                    )
+                if orphans:
+                    log.info("[startup] recovered %d orphaned shift(s)", len(orphans))
+    except Exception as e:
+        log.error("[startup] failed to recover orphaned shifts: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await _recover_orphaned_shifts()
     yield
     _teardown_frontend()
     await _teardown_worker()
@@ -414,6 +441,22 @@ async def _crm_update_shift(shift_id: int, data: dict) -> None:
         resp.raise_for_status()
 
 
+async def _fetch_next_unread_thread_id() -> int | None:
+    """Fetch the ID of the next unread thread (same as crm shift next)."""
+    import httpx
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{_CRM_API_URL}/api/shift/next", timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                thread = data.get("thread")
+                if thread:
+                    return thread.get("id")
+    except Exception:
+        pass
+    return None
+
+
 async def _fetch_thread_subject(thread_id: str) -> str | None:
     """Fetch a thread's subject from CRM. Returns None on failure."""
     import httpx
@@ -428,6 +471,30 @@ async def _fetch_thread_subject(thread_id: str) -> str | None:
     return None
 
 
+def _extract_json_detail(cmd: str) -> str | None:
+    """Try to extract a meaningful label from a JSON payload in a crm create command."""
+    import json as _json
+    import re
+    # Find JSON object in the command (between first { and last })
+    m = re.search(r'\{.*\}', cmd, re.DOTALL)
+    if not m:
+        return None
+    try:
+        data = _json.loads(m.group())
+    except (ValueError, _json.JSONDecodeError):
+        # Try single-quote JSON (shell style)
+        try:
+            data = _json.loads(m.group().replace("'", '"'))
+        except Exception:
+            return None
+    # Look for meaningful fields in priority order
+    for field in ("subject", "title", "name", "description"):
+        val = data.get(field)
+        if val and isinstance(val, str):
+            return val[:60]
+    return None
+
+
 async def _progress_from_crm_cmd(cmd: str, current_subject: str | None) -> tuple[str | None, str | None]:
     """Derive a progress message from a crm CLI command.
 
@@ -437,8 +504,16 @@ async def _progress_from_crm_cmd(cmd: str, current_subject: str | None) -> tuple
     if len(parts) < 3:
         return None, current_subject
     entity, action = parts[1], parts[2]
-    ctx = f": {current_subject}" if current_subject else "..."
 
+    # For create commands, try to extract detail from JSON payload
+    detail = _extract_json_detail(cmd) if action == "create" else None
+    # Use extracted detail, fall back to current thread subject
+    ctx = f": {detail or current_subject}" if (detail or current_subject) else "..."
+
+    if entity == "shift" and action == "next":
+        return "Fetching next thread...", None  # clear subject, will be set from thread
+    if entity == "shift" and action == "complete":
+        return "Marking thread complete...", current_subject
     if entity == "threads" and action == "list":
         return "Scanning email threads...", current_subject
     if entity == "threads" and action == "get" and len(parts) > 3 and parts[3].isdigit():
@@ -470,22 +545,22 @@ async def _run_shift_background(shift_id: int) -> None:
     tool_count = 0
     cost_usd: float | None = None
     last_progress_update = 0.0  # monotonic time of last CRM progress update
+    text_parts: list[str] = []
+    threads_read = 0
     try:
         await _teardown_worker()
         client = await _ensure_worker()
         log.info("[shift] worker ready (%s), sending /shift skill", _worker_session_id)
         await client.query("/shift")
 
-        text_parts: list[str] = []
         progress_msg = "Starting shift..."
         current_subject: str | None = None  # tracks the thread subject being processed
-        threads_read = 0
-        emails_read = 0
+        current_thread_id: int | None = None
         loop = asyncio.get_event_loop()
-        cm = asyncio.timeout_at(loop.time() + _RESPONSE_TIMEOUT)
+        cm = asyncio.timeout_at(loop.time() + _SHIFT_MSG_TIMEOUT)
         async with cm:
             async for msg in client.receive_response():
-                cm.reschedule(loop.time() + _RESPONSE_TIMEOUT)
+                cm.reschedule(loop.time() + _SHIFT_MSG_TIMEOUT)
                 if isinstance(msg, ResultMessage):
                     cost_usd = msg.total_cost_usd
                     log.info("[shift] result: cost=$%.4f turns=%d duration=%dms",
@@ -504,10 +579,16 @@ async def _run_shift_background(shift_id: int) -> None:
                             if cmd.startswith("crm "):
                                 parts = cmd.split()
                                 if len(parts) >= 3:
-                                    if parts[1] == "threads" and parts[2] == "get":
+                                    if parts[1] == "threads" and parts[2] == "get" and len(parts) > 3 and parts[3].isdigit():
+                                        current_thread_id = int(parts[3])
+                                    elif parts[1] == "shift" and parts[2] == "next":
+                                        # Agent fetching next thread — look up which one
+                                        tid = await _fetch_next_unread_thread_id()
+                                        if tid:
+                                            current_thread_id = tid
+                                    elif parts[1] == "shift" and parts[2] == "complete":
                                         threads_read += 1
-                                    elif parts[1] == "emails" and parts[2] == "get":
-                                        emails_read += 1
+                                        current_thread_id = None
                                 new_progress, current_subject = await _progress_from_crm_cmd(cmd, current_subject)
                                 if new_progress:
                                     progress_msg = new_progress
@@ -520,7 +601,7 @@ async def _run_shift_background(shift_id: int) -> None:
                                     await _crm_update_shift(shift_id, {
                                         "summary": progress_msg,
                                         "threads_processed": threads_read,
-                                        "emails_processed": emails_read,
+                                        "current_thread_id": current_thread_id,
                                     })
                                 except Exception:
                                     pass  # non-critical
@@ -556,6 +637,7 @@ async def _run_shift_background(shift_id: int) -> None:
             "status": "completed",
             "completed_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
             "summary": summary,
+            "current_thread_id": None,
             **metrics,
         }
         if cost_usd is not None:
@@ -563,13 +645,31 @@ async def _run_shift_background(shift_id: int) -> None:
         await _crm_update_shift(shift_id, update_data)
     except TimeoutError:
         elapsed = _time.monotonic() - t0
-        log.error("[shift] timeout after %.0fs (%d tool calls)", elapsed, tool_count)
         await _teardown_worker()
-        await _crm_update_shift(shift_id, {
-            "status": "failed",
-            "completed_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
-            "summary": f"Timed out after {elapsed:.0f}s ({tool_count} tool calls)",
-        })
+        if threads_read > 0:
+            # Partial success — threads were completed before timeout
+            log.warning("[shift] timed out after %.0fs (%d tool calls), but %d threads completed — marking as completed (partial)",
+                        elapsed, tool_count, threads_read)
+            summary = "\n\n".join(text_parts) if text_parts else ""
+            metrics = _parse_shift_summary(summary) if summary else {}
+            update_data: dict = {
+                "status": "completed",
+                "completed_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+                "summary": summary or f"Completed {threads_read} threads before context limit ({elapsed:.0f}s, {tool_count} tool calls)",
+                "current_thread_id": None,
+                "threads_processed": threads_read,
+                **metrics,
+            }
+            if cost_usd is not None:
+                update_data["cost_usd"] = round(cost_usd, 4)
+            await _crm_update_shift(shift_id, update_data)
+        else:
+            log.error("[shift] timeout after %.0fs (%d tool calls) with no threads completed", elapsed, tool_count)
+            await _crm_update_shift(shift_id, {
+                "status": "failed",
+                "completed_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+                "summary": f"Timed out after {elapsed:.0f}s ({tool_count} tool calls)",
+            })
     except Exception as exc:
         elapsed = _time.monotonic() - t0
         log.error("[shift] error after %.0fs (%d tool calls): %s", elapsed, tool_count, exc)
@@ -644,13 +744,19 @@ async def worker_status():
 
 @app.post("/session/restart")
 async def restart_session():
-    global _busy, _pending_worker_result, _pending_worker_task_id
-    _busy = False
+    global _pending_worker_result, _pending_worker_task_id
     _pending_worker_result = None
     _pending_worker_task_id = None
     _teardown_frontend()
-    await _teardown_worker()
-    return {"status": "restarted"}
+    # Only tear down worker if no shift is running
+    if _active_shift_id is None:
+        global _busy
+        _busy = False
+        await _teardown_worker()
+        return {"status": "restarted"}
+    else:
+        log.info("[restart] frontend restarted, worker preserved (shift %d running)", _active_shift_id)
+        return {"status": "restarted", "shift_active": _active_shift_id}
 
 
 @app.get("/session/status")
@@ -661,6 +767,7 @@ async def session_status():
         "session_id": _frontend_session_id,
         "message_count": _frontend_msg_count + _worker_msg_count,
         "busy": _busy,
+        "shift_active": _active_shift_id,
         # Detailed per-session info
         "frontend": {
             "session_id": _frontend_session_id,

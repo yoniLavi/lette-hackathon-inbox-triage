@@ -29,6 +29,7 @@ class Shift(Base):
     tasks_created = Column(Integer, default=0)
     summary = Column(Text)
     cost_usd = Column(Float)
+    current_thread_id = Column(Integer)
     case_id = Column(Integer, ForeignKey("cases.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())

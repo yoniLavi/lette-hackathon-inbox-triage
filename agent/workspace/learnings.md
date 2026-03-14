@@ -78,3 +78,35 @@ improvements between shifts.
 - Smart lock failures are lockout emergencies requiring immediate master key dispatch (30 min response target)
 - Water leaks through light fittings are electrical hazards - instruct tenant to avoid switches/outlets and evacuate if sparking
 - Repeat noise complaints (3+ incidents logged) require formal written warnings citing quiet enjoyment clause breach and potential tenancy termination
+
+## CRITICAL: Welfare Emergency Response Protocol
+
+**CASE 389 INCIDENT (March 2026) — Process Failure Documentation**
+
+Welfare emergency at Graylings Apt 13A: 7-day delay between report and emergency services contact. Tenant missing 1+ week, strong smell, mail piling up. Report received March 6, action taken March 13.
+
+**Critical Failure Points Identified:**
+1. Draft reply created but NO physical welfare check conducted for 7 days
+2. Welfare emergency indicators (smell + missing tenant + mail piling) not recognized as requiring immediate physical response
+3. Tenant contact record missing from CRM (Apt 13A had no contact entry)
+4. No automated monitoring/escalation for overdue critical priority tasks
+5. Task created retrospectively with already-overdue deadline
+
+**Correct Welfare Emergency Response:**
+- **Smell + missing tenant + mail piling = IMMEDIATE physical welfare check** (same day, within 2 hours)
+- Do NOT send draft email and wait — physical check required first
+- Contact Gardaí (999/112) immediately if unable to reach tenant by phone/door knock
+- Property manager MUST attend with master key
+- Break door access if needed (life safety overrides property damage)
+- Welfare checks are NOT routine maintenance — they are potential life-or-death situations
+
+**Missing Contact Records:**
+- ALL occupied units must have tenant contact records in CRM for emergency situations
+- Conduct regular audits of contact completeness (quarterly minimum)
+- Flag gaps to property managers immediately
+
+**Process Improvements Required:**
+1. Emergency triage training for all staff on welfare indicators
+2. Automated alerts for overdue critical/urgent tasks
+3. Contact record completeness audits
+4. Clear protocol: welfare emergency = physical check within 2 hours, not email correspondence

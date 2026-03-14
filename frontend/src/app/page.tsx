@@ -57,12 +57,15 @@ export default function Dashboard() {
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    const criticalCases = cases.filter(c => priorityToTier(c.priority) === "CRITICAL");
-    const highCases = cases.filter(c => priorityToTier(c.priority) === "HIGH");
+    // Filter out internal shift journal cases
+    const visibleCases = cases.filter(c => !c.name.startsWith("Agent Shift"));
+
+    const criticalCases = visibleCases.filter(c => priorityToTier(c.priority) === "CRITICAL");
+    const highCases = visibleCases.filter(c => priorityToTier(c.priority) === "HIGH");
 
     // Work queue: non-closed cases that need attention, ordered by action priority
     const actionOrder = { triage: 0, draft: 1, pending: 2, done: 3 };
-    const workQueue = cases
+    const workQueue = visibleCases
         .filter(c => c.status !== "closed")
         .filter(c => caseActionStatus(c).style !== "done")
         .sort((a, b) => actionOrder[caseActionStatus(a).style] - actionOrder[caseActionStatus(b).style]);

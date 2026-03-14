@@ -2,15 +2,16 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Play, Clock, CheckCircle2, XCircle, Mail, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowLeft, Play, Clock, CheckCircle2, XCircle, Mail, ChevronDown, ChevronRight, AlertTriangle, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { getShifts, getShift, getUnreadThreads, contactName } from "@/lib/crm";
-import type { CrmShift, CrmThread } from "@/lib/crm";
+import { getShifts, getShift, getUnreadThreads, getCasesCreatedDuring, getCasesUpdatedDuring, contactName } from "@/lib/crm";
+import type { CrmShift, CrmThread, CrmCase } from "@/lib/crm";
+import { SituationCard } from "@/components/dashboard/SituationCard";
 
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:8001";
 
-function formatDuration(startedAt: string, completedAt: string | null): string {
-    if (!completedAt) return "running...";
+function formatDuration(startedAt: string, completedAt: string | null, status?: string): string {
+    if (!completedAt) return status === "failed" ? "interrupted" : "running...";
     const ms = new Date(completedAt).getTime() - new Date(startedAt).getTime();
     const secs = Math.floor(ms / 1000);
     if (secs < 60) return `${secs}s`;
@@ -60,12 +61,58 @@ function StatusBadge({ status }: { status: string }) {
     );
 }
 
+function priorityToTier(priority: string): "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" {
+    switch (priority?.toLowerCase()) {
+        case "critical": return "CRITICAL";
+        case "high": return "HIGH";
+        case "low": return "LOW";
+        default: return "MEDIUM";
+    }
+}
+
 function ShiftCard({ shift, defaultExpanded }: { shift: CrmShift; defaultExpanded?: boolean }) {
     const [expanded, setExpanded] = useState(defaultExpanded || false);
+    const [casesExpanded, setCasesExpanded] = useState(false);
+    const [updatedExpanded, setUpdatedExpanded] = useState(false);
+    const [createdCases, setCreatedCases] = useState<CrmCase[]>([]);
+    const [updatedCases, setUpdatedCases] = useState<CrmCase[]>([]);
+    const [casesLoaded, setCasesLoaded] = useState(false);
     const isRunning = shift.status === "in_progress";
+    const isFailed = shift.status === "failed";
+
+    const fetchCases = useCallback(async () => {
+        const after = shift.started_at;
+        const before = shift.completed_at || new Date().toISOString();
+        const journalId = shift.case_id;
+        const [created, updated] = await Promise.all([
+            getCasesCreatedDuring(after, before).catch(() => []),
+            getCasesUpdatedDuring(after, before).catch(() => []),
+        ]);
+        // Filter out the shift journal case
+        const filteredCreated = created.filter(c => c.id !== journalId);
+        // Updated = modified during shift but NOT created during shift (and not journal)
+        const createdIds = new Set(created.map(c => c.id));
+        const filteredUpdated = updated.filter(c => c.id !== journalId && !createdIds.has(c.id));
+        setCreatedCases(filteredCreated);
+        setUpdatedCases(filteredUpdated);
+        setCasesLoaded(true);
+    }, [shift.started_at, shift.completed_at, shift.case_id]);
+
+    // Fetch cases when expanded or running
+    useEffect(() => {
+        if ((!expanded && !isRunning) || casesLoaded) return;
+        fetchCases();
+    }, [expanded, isRunning, casesLoaded, fetchCases]);
+
+    // Re-fetch cases periodically during active shift
+    useEffect(() => {
+        if (!isRunning) return;
+        const interval = setInterval(fetchCases, 5000);
+        return () => clearInterval(interval);
+    }, [isRunning, fetchCases]);
 
     return (
-        <Card className="bg-[#F2F2EC] border-transparent overflow-hidden">
+        <Card className={`border-transparent overflow-hidden ${isFailed ? "bg-red-50/80" : "bg-[#F2F2EC]"}`}>
             <button
                 onClick={() => !isRunning && setExpanded(!expanded)}
                 className={`w-full text-left p-4 flex items-center gap-3 transition-colors ${isRunning ? "cursor-default" : "hover:bg-[#EDEDE7]"}`}
@@ -84,7 +131,7 @@ function ShiftCard({ shift, defaultExpanded }: { shift: CrmShift; defaultExpande
                         {isRunning
                             ? <ElapsedTimer startedAt={shift.started_at} />
                             : <span className="text-xs text-[#0F1016]/40 font-sans">
-                                {formatDuration(shift.started_at, shift.completed_at)}
+                                {formatDuration(shift.started_at, shift.completed_at, shift.status)}
                             </span>
                         }
                     </div>
@@ -93,10 +140,9 @@ function ShiftCard({ shift, defaultExpanded }: { shift: CrmShift; defaultExpande
                             <p className="text-xs text-blue-600/70 font-sans italic animate-pulse">
                                 {shift.summary || "Starting shift..."}
                             </p>
-                            {(shift.threads_processed > 0 || shift.emails_processed > 0) && (
+                            {shift.threads_processed > 0 && (
                                 <div className="flex gap-3 mt-1 text-[11px] text-[#0F1016]/40 font-sans">
-                                    <span>{shift.threads_processed} thread{shift.threads_processed !== 1 ? "s" : ""} read</span>
-                                    <span>{shift.emails_processed} email{shift.emails_processed !== 1 ? "s" : ""} read</span>
+                                    <span>{shift.threads_processed} thread{shift.threads_processed !== 1 ? "s" : ""} processed</span>
                                 </div>
                             )}
                         </div>
@@ -112,8 +158,56 @@ function ShiftCard({ shift, defaultExpanded }: { shift: CrmShift; defaultExpande
                 </div>
             </button>
 
+            {/* Cases created/updated during this shift */}
+            {(createdCases.length > 0 || updatedCases.length > 0) && (isRunning || expanded) && (
+                <div className="px-4 pb-3 border-t border-[#0F1016]/5">
+                    {createdCases.length > 0 && (
+                        <>
+                            <button
+                                onClick={() => setCasesExpanded(!casesExpanded)}
+                                className="flex items-center gap-1.5 mt-3 mb-2 text-[10px] font-sans font-bold uppercase tracking-[0.15em] text-[#0F1016]/50 hover:text-[#0000EE] transition-colors"
+                            >
+                                {casesExpanded
+                                    ? <ChevronDown className="w-3 h-3" />
+                                    : <ChevronRight className="w-3 h-3" />
+                                }
+                                {createdCases.length} case{createdCases.length !== 1 ? "s" : ""} created
+                            </button>
+                            {casesExpanded && (
+                                <div className="space-y-2">
+                                    {createdCases.map(c => (
+                                        <SituationCard key={c.id} crmCase={c} tier={priorityToTier(c.priority)} />
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    )}
+                    {updatedCases.length > 0 && (
+                        <>
+                            <button
+                                onClick={() => setUpdatedExpanded(!updatedExpanded)}
+                                className="flex items-center gap-1.5 mt-3 mb-2 text-[10px] font-sans font-bold uppercase tracking-[0.15em] text-[#0F1016]/50 hover:text-[#0000EE] transition-colors"
+                            >
+                                {updatedExpanded
+                                    ? <ChevronDown className="w-3 h-3" />
+                                    : <ChevronRight className="w-3 h-3" />
+                                }
+                                {updatedCases.length} case{updatedCases.length !== 1 ? "s" : ""} updated
+                            </button>
+                            {updatedExpanded && (
+                                <div className="space-y-2">
+                                    {updatedCases.map(c => (
+                                        <SituationCard key={c.id} crmCase={c} tier={priorityToTier(c.priority)} />
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
             {!isRunning && expanded && (
-                <div className="px-4 pb-4 border-t border-[#0F1016]/5">
+                <div className={`px-4 pb-4 ${(createdCases.length > 0 || updatedCases.length > 0) ? "" : "border-t border-[#0F1016]/5"}`}>
                     {shift.summary && (
                         <pre className="mt-3 text-xs text-[#0F1016]/70 font-sans whitespace-pre-wrap leading-relaxed max-h-[400px] overflow-y-auto">
                             {shift.summary}
@@ -135,6 +229,34 @@ function ShiftCard({ shift, defaultExpanded }: { shift: CrmShift; defaultExpande
     );
 }
 
+type WorkerStatus = "online" | "busy" | "offline" | "error" | "unresponsive";
+
+function WorkerIndicator({ status, onRestart }: { status: WorkerStatus; onRestart: () => void }) {
+    const config: Record<WorkerStatus, { icon: React.ReactNode; label: string; color: string }> = {
+        online: { icon: <Wifi className="w-3 h-3" />, label: "Worker Online", color: "text-emerald-500" },
+        busy: { icon: <Clock className="w-3 h-3 animate-pulse" />, label: "Worker Busy", color: "text-blue-500" },
+        offline: { icon: <WifiOff className="w-3 h-3" />, label: "Worker Offline", color: "text-red-500" },
+        unresponsive: { icon: <AlertTriangle className="w-3 h-3" />, label: "Worker Unresponsive", color: "text-amber-500" },
+        error: { icon: <AlertTriangle className="w-3 h-3" />, label: "Worker Error", color: "text-amber-500" },
+    };
+    const c = config[status];
+    return (
+        <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-sans font-bold uppercase tracking-wider ${c.color}`}>
+                {c.icon} {c.label}
+            </span>
+            {(status === "offline" || status === "error" || status === "unresponsive") && (
+                <button
+                    onClick={onRestart}
+                    className="inline-flex items-center gap-1 text-[11px] font-sans font-bold text-[#0000EE] hover:text-[#0000CC] uppercase tracking-wider"
+                >
+                    <RefreshCw className="w-3 h-3" /> Restart
+                </button>
+            )}
+        </div>
+    );
+}
+
 export default function ShiftsPage() {
     const [shifts, setShifts] = useState<CrmShift[]>([]);
     const [backlogThreads, setBacklogThreads] = useState<CrmThread[]>([]);
@@ -142,7 +264,9 @@ export default function ShiftsPage() {
     const [activeShiftId, setActiveShiftId] = useState<number | null>(null);
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [workerStatus, setWorkerStatus] = useState<WorkerStatus>("online");
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const healthRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const loadData = useCallback(async () => {
         const [shiftsData, backlog] = await Promise.all([
@@ -153,16 +277,44 @@ export default function ShiftsPage() {
         setBacklogThreads(backlog.threads);
         setBacklogTotal(backlog.total);
 
-        // Detect in-progress shift
+        // Sync active shift state with CRM
         const running = shiftsData.find((s: CrmShift) => s.status === "in_progress");
-        if (running) {
-            setActiveShiftId(running.id);
-        }
+        setActiveShiftId(running ? running.id : null);
     }, []);
+
+    // Check worker health — cross-references agent status with CRM shift state
+    const checkWorkerHealth = useCallback(async () => {
+        try {
+            const resp = await fetch(`${AGENT_URL}/session/status`, { signal: AbortSignal.timeout(5000) });
+            if (!resp.ok) {
+                setWorkerStatus("error");
+                return;
+            }
+            const data = await resp.json();
+            if (data.shift_active) {
+                setWorkerStatus("busy");
+            } else if (data.busy) {
+                setWorkerStatus("busy");
+            } else {
+                // Agent says idle — but does the CRM still have an in_progress shift?
+                const hasStuckShift = shifts.some(s => s.status === "in_progress");
+                if (hasStuckShift) {
+                    setWorkerStatus("unresponsive");
+                } else {
+                    setWorkerStatus("online");
+                }
+            }
+        } catch {
+            setWorkerStatus("offline");
+        }
+    }, [shifts]);
 
     useEffect(() => {
         loadData();
-    }, [loadData]);
+        checkWorkerHealth();
+        healthRef.current = setInterval(checkWorkerHealth, 10000);
+        return () => { if (healthRef.current) clearInterval(healthRef.current); };
+    }, [loadData, checkWorkerHealth]);
 
     // Poll for active shift progress
     useEffect(() => {
@@ -179,9 +331,9 @@ export default function ShiftsPage() {
                 const shift = await getShift(activeShiftId);
                 if (shift.status !== "in_progress") {
                     setActiveShiftId(null);
-                    await loadData(); // refresh everything
+                    await loadData();
+                    await checkWorkerHealth();
                 } else {
-                    // Update the in-progress shift in the list
                     setShifts(prev => prev.map(s => s.id === activeShiftId ? shift : s));
                 }
             } catch {
@@ -195,7 +347,20 @@ export default function ShiftsPage() {
                 pollRef.current = null;
             }
         };
-    }, [activeShiftId, loadData]);
+    }, [activeShiftId, loadData, checkWorkerHealth]);
+
+    const restartWorker = async () => {
+        setError(null);
+        try {
+            const resp = await fetch(`${AGENT_URL}/session/restart`, { method: "POST" });
+            if (resp.ok) {
+                setWorkerStatus("online");
+                await loadData();
+            }
+        } catch {
+            setError("Failed to restart worker");
+        }
+    };
 
     const startShift = async () => {
         setStarting(true);
@@ -214,7 +379,7 @@ export default function ShiftsPage() {
             }
             const data = await resp.json();
             setActiveShiftId(data.shift_id);
-            // Add a placeholder shift to the list
+            setWorkerStatus("busy");
             const newShift: CrmShift = {
                 id: data.shift_id,
                 started_at: new Date().toISOString(),
@@ -226,6 +391,7 @@ export default function ShiftsPage() {
                 tasks_created: 0,
                 summary: null,
                 cost_usd: null,
+                current_thread_id: null,
                 case_id: null,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
@@ -239,6 +405,8 @@ export default function ShiftsPage() {
     };
 
     const isRunning = activeShiftId !== null;
+    const activeShift = shifts.find(s => s.id === activeShiftId);
+    const activeThreadId = activeShift?.current_thread_id ?? null;
 
     return (
         <div className="min-h-screen flex flex-col relative z-0 bg-[#F7F7F2]">
@@ -257,9 +425,12 @@ export default function ShiftsPage() {
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h1 className="text-2xl font-serif font-medium text-[#0F1016]">AI Shifts</h1>
-                        <p className="text-sm text-[#0F1016]/50 font-sans mt-1">
-                            Batch email triage by the AI agent
-                        </p>
+                        <div className="flex items-center gap-3 mt-1">
+                            <p className="text-sm text-[#0F1016]/50 font-sans">
+                                Batch email triage by the AI agent
+                            </p>
+                            <WorkerIndicator status={workerStatus} onRestart={restartWorker} />
+                        </div>
                     </div>
                     <button
                         onClick={startShift}
@@ -298,9 +469,9 @@ export default function ShiftsPage() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_60ch] gap-8">
                     {/* Shift history */}
-                    <div className="lg:col-span-2">
+                    <div>
                         <h2 className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">
                             Shift History
                             <span className="ml-4 h-px flex-1 bg-slate-200"></span>
@@ -321,7 +492,7 @@ export default function ShiftsPage() {
                     </div>
 
                     {/* Backlog */}
-                    <div>
+                    <div className="min-w-0">
                         <h2 className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">
                             Email Backlog
                             <span className="ml-4 h-px flex-1 bg-slate-200"></span>
@@ -337,23 +508,28 @@ export default function ShiftsPage() {
                             </div>
 
                             {backlogThreads.length > 0 ? (
-                                <div className="space-y-2">
-                                    {backlogThreads.slice(0, 15).map(thread => (
-                                        <div key={thread.id} className="flex items-start gap-2 text-xs font-sans">
-                                            <span className="text-[#0F1016]/30 mt-0.5 flex-shrink-0">&bull;</span>
-                                            <div className="min-w-0">
-                                                <div className="text-[#0F1016]/80 truncate">{thread.subject}</div>
-                                                <div className="text-[#0F1016]/40">
-                                                    {thread.contact ? contactName(thread.contact) : "Unknown"} &middot; {thread.email_count} email{thread.email_count !== 1 ? "s" : ""}
+                                <div className="space-y-1 max-h-[70vh] overflow-y-auto overflow-x-hidden">
+                                    {backlogThreads.map(thread => {
+                                        const isActive = activeThreadId === thread.id;
+                                        return (
+                                            <div key={thread.id} className={`flex items-start gap-2 text-xs font-sans rounded-lg px-2 py-1.5 -mx-2 transition-colors ${isActive ? "bg-blue-100 border border-blue-300" : ""}`}>
+                                                {isActive
+                                                    ? <Clock className="w-3 h-3 text-blue-500 mt-0.5 flex-shrink-0 animate-pulse" />
+                                                    : <span className="text-[#0F1016]/30 mt-0.5 flex-shrink-0">&bull;</span>
+                                                }
+                                                <div className="min-w-0 flex-1">
+                                                    <div className={`break-words ${isActive ? "text-blue-700 font-bold" : "text-[#0F1016]/80"}`}>{thread.subject}</div>
+                                                    <div className={`flex items-center gap-1.5 ${isActive ? "text-blue-500/60" : "text-[#0F1016]/40"}`}>
+                                                        <span>{thread.contact ? contactName(thread.contact) : "Unknown"}</span>
+                                                        <span>&middot;</span>
+                                                        <span>{thread.email_count} email{thread.email_count !== 1 ? "s" : ""}</span>
+                                                        <span>&middot;</span>
+                                                        <span>{formatTime(thread.last_activity_at)}</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {backlogTotal > 15 && (
-                                        <p className="text-[11px] text-[#0F1016]/40 font-sans italic pt-1">
-                                            + {backlogTotal - 15} more threads
-                                        </p>
-                                    )}
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <p className="text-xs text-[#0F1016]/40 font-sans italic">
