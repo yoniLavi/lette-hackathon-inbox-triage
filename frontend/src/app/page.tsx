@@ -8,17 +8,78 @@ import { caseActionStatus } from "@/lib/crm";
 import { usePageData, buildDashboardContext } from "@/lib/page-context";
 import { SituationCard } from "@/components/dashboard/SituationCard";
 import { QuickStats } from "@/components/dashboard/QuickStats";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 
-// Map CRM priority to urgency tier
+// Map CRM priority to urgency tier (CRM uses critical/urgent/high/normal/medium/low)
 function priorityToTier(priority: string): "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" {
     switch (priority) {
-        case "critical": return "CRITICAL";
+        case "critical":
+        case "urgent": return "CRITICAL";
         case "high": return "HIGH";
-        case "medium": return "MEDIUM";
+        case "medium":
+        case "normal": return "MEDIUM";
         case "low": return "LOW";
         default: return "MEDIUM";
     }
+}
+
+// Normalize CRM priority to the 4 display tiers
+function normalizePriority(priority: string): PriorityKey {
+    switch (priority) {
+        case "critical":
+        case "urgent": return "critical";
+        case "high": return "high";
+        case "low": return "low";
+        default: return "medium";
+    }
+}
+
+const priorityConfig = {
+    critical: { label: "Critical", color: "text-[#EF4444]", dot: "bg-red-500" },
+    high: { label: "High Priority", color: "text-[#F59E0B]", dot: "bg-amber-500" },
+    medium: { label: "Medium Priority", color: "text-[#0000EE]", dot: "bg-[#0000EE]" },
+    low: { label: "Low Priority", color: "text-[#0F1016]/40", dot: "bg-[#0F1016]/20" },
+} as const;
+
+type PriorityKey = keyof typeof priorityConfig;
+
+function PrioritySection({ priority, cases, defaultOpen }: { priority: PriorityKey; cases: CrmCase[]; defaultOpen: boolean }) {
+    const [open, setOpen] = useState(defaultOpen);
+    const config = priorityConfig[priority];
+
+    if (cases.length === 0) return null;
+
+    return (
+        <div>
+            <button
+                onClick={() => setOpen(!open)}
+                className="w-full flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3 group cursor-pointer"
+            >
+                <ChevronDown className={`w-3.5 h-3.5 mr-1.5 transition-transform ${open ? "" : "-rotate-90"} ${config.color}`} />
+                {config.label}
+                <span className="ml-4 h-px flex-1 bg-slate-200"></span>
+                <span className={`ml-4 ${config.color}`}>{cases.length}</span>
+            </button>
+            <AnimatePresence initial={false}>
+                {open && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="space-y-3 pb-4">
+                            {cases.map(c => (
+                                <SituationCard key={c.id} crmCase={c} tier={priorityToTier(c.priority)} />
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
 }
 
 export default function Dashboard() {
@@ -62,15 +123,18 @@ export default function Dashboard() {
 
     // Unified work queue: non-closed, non-done cases sorted by action type then priority
     const actionOrder = { triage: 0, draft: 1, pending: 2, done: 3 };
-    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    const priorityOrder: Record<string, number> = { critical: 0, urgent: 0, high: 1, medium: 2, normal: 2, low: 3 };
     const workQueue = visibleCases
         .filter(c => c.status !== "closed")
         .filter(c => caseActionStatus(c).style !== "done")
         .sort((a, b) => {
             const actionDiff = actionOrder[caseActionStatus(a).style] - actionOrder[caseActionStatus(b).style];
             if (actionDiff !== 0) return actionDiff;
-            return (priorityOrder[a.priority as keyof typeof priorityOrder] ?? 2) - (priorityOrder[b.priority as keyof typeof priorityOrder] ?? 2);
+            return (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
         });
+
+    // Group by normalized priority for collapsible sections
+    const byPriority = (p: PriorityKey) => workQueue.filter(c => normalizePriority(c.priority) === p);
 
     const openCaseCount = cases.filter(c => c.status !== "closed").length;
 
@@ -124,22 +188,25 @@ export default function Dashboard() {
                 <div ref={dashboardRef} className="grid grid-cols-1 lg:grid-cols-12 gap-4 pt-4">
                     <div className="lg:col-span-8">
                         <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                            <h3 className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">
-                                Work Queue
+                            <h3 className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">
+                                Open Cases
                                 <span className="ml-4 h-px flex-1 bg-slate-200"></span>
                                 <span className="ml-4 text-[#0000EE]">{workQueue.length}</span>
                             </h3>
-                            <div className="space-y-3">
-                                {workQueue.map(c => (
-                                    <SituationCard key={c.id} crmCase={c} tier={priorityToTier(c.priority)} />
-                                ))}
-                                {workQueue.length === 0 && cases.length > 0 && (
-                                    <div className="bg-[#F2F2EC] rounded-[20px] p-6 text-center">
-                                        <p className="text-sm text-[#0F1016]/60 font-sans">All caught up! No cases need your attention right now.</p>
-                                    </div>
-                                )}
-                                {cases.length === 0 && <p className="text-sm text-slate-400 italic">Loading...</p>}
-                            </div>
+                            {workQueue.length === 0 && cases.length > 0 && (
+                                <div className="bg-[#F2F2EC] rounded-[20px] p-6 text-center">
+                                    <p className="text-sm text-[#0F1016]/60 font-sans">All caught up! No cases need your attention right now.</p>
+                                </div>
+                            )}
+                            {cases.length === 0 && <p className="text-sm text-slate-400 italic">Loading...</p>}
+                            {workQueue.length > 0 && (
+                                <div className="space-y-1">
+                                    <PrioritySection priority="critical" cases={byPriority("critical")} defaultOpen={true} />
+                                    <PrioritySection priority="high" cases={byPriority("high")} defaultOpen={false} />
+                                    <PrioritySection priority="medium" cases={byPriority("medium")} defaultOpen={false} />
+                                    <PrioritySection priority="low" cases={byPriority("low")} defaultOpen={false} />
+                                </div>
+                            )}
                         </motion.section>
                     </div>
 
