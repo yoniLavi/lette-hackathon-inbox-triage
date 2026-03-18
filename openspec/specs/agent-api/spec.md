@@ -83,13 +83,19 @@ The agent API SHALL expose `POST /prompt/stream` that returns a Server-Sent Even
 - **AND** tears down the SDK client for recovery
 
 ### Requirement: Agent Shift
-The agent API SHALL expose an endpoint that triggers batch processing of active emails, where the agent triages each thread and takes appropriate CRM actions.
+The agent API SHALL expose an endpoint that triggers batch processing of active emails, where the agent triages each thread and takes appropriate CRM actions. The endpoint SHALL be asynchronous — returning immediately with a shift identifier while processing runs in the background.
 
-#### Scenario: Start a shift
+#### Scenario: Start a shift (async)
 - **WHEN** a client sends `POST /shift`
-- **THEN** the agent starts a fresh session
-- **AND** processes unread threads via the CRM shift work-item endpoint
-- **AND** returns a structured summary of actions taken
+- **THEN** the agent creates a Shift record in the CRM with status "in_progress"
+- **AND** starts processing in the background
+- **AND** returns `{"shift_id": N}` immediately
+
+#### Scenario: Shift progress via CRM polling
+- **WHEN** a shift is running in the background
+- **THEN** the client polls `GET /api/shifts/{id}` on the CRM API for status
+- **AND** when `status` changes to "completed" or "failed", the shift is done
+- **AND** the Shift record contains final metrics and summary
 
 #### Scenario: Per-thread processing
 - **WHEN** the agent processes a thread during a shift
@@ -112,8 +118,17 @@ The agent API SHALL expose an endpoint that triggers batch processing of active 
 #### Scenario: Shift journal via Case
 - **WHEN** the agent starts a shift
 - **THEN** it creates a Case (e.g., "Agent Shift — 2026-03-09 10:30") with status "in_progress"
+- **AND** links the Case to the Shift record via `case_id`
 - **AND** as it processes each thread, it adds a Note to the Case summarizing the actions taken
 - **AND** when the shift completes, it updates the Case status to "closed" with a final summary
+
+#### Scenario: Shift completion updates records
+- **WHEN** the agent finishes processing all available threads (or pacing limit reached)
+- **THEN** it updates the Shift record with `status: "completed"`, `completed_at`, thread/email/draft/task counts, and a text summary
+
+#### Scenario: Shift failure updates records
+- **WHEN** the agent encounters an unrecoverable error during a shift
+- **THEN** it updates the Shift record with `status: "failed"` and a summary describing what was processed before the failure
 
 #### Scenario: Shift completion marks threads read
 - **WHEN** the agent finishes processing a thread
@@ -138,7 +153,9 @@ The agent API SHALL expose an endpoint that triggers batch processing of active 
 
 #### Scenario: Shift via CLI
 - **WHEN** a user runs `scripts/agent.py --shift`
-- **THEN** the script calls `POST /shift` and prints the summary to stdout
+- **THEN** the script calls `POST /shift`, receives the `shift_id`
+- **AND** polls `GET /api/shifts/{id}` on the CRM API until complete
+- **AND** prints the summary to stdout
 
 #### Scenario: Insight capture during shift
 - **WHEN** the agent discovers an operational pattern, gotcha, or effective technique while processing threads

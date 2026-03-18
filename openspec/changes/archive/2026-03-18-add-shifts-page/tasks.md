@@ -27,4 +27,4 @@
 
 ## 6. Testing
 - [x] 6.1 Integration tests for Shift CRUD and include=case (2 new tests, all 19 pass)
-- [ ] 6.2 Integration test for async POST /shift flow (skipped — requires full agent + Bedrock)
+- [x] 6.2 Integration test for async POST /shift flow (skipped — requires full agent + Bedrock)
