@@ -120,3 +120,17 @@ async def await_result(task_id: str, timeout: float = 120.0) -> str:
         if task_id in _tasks:
             del _tasks[task_id]
         raise
+
+
+def cancel_all() -> None:
+    """Cancel all pending worker tasks. Called on session teardown."""
+    global _worker_busy
+    cancelled = 0
+    for task_id, future in list(_tasks.items()):
+        if not future.done():
+            future.set_exception(RuntimeError(f"Worker task {task_id} cancelled (session restarted)"))
+            cancelled += 1
+    _tasks.clear()
+    _worker_busy = False
+    if cancelled:
+        log.info("[cancel_all] cancelled %d pending task(s)", cancelled)

@@ -160,6 +160,7 @@ async def _ensure_worker() -> ClaudeSDKClient:
 
 async def _teardown_worker() -> None:
     global _worker_client, _worker_session_id, _worker_msg_count
+    mcp_worker.cancel_all()  # resolve pending futures before disconnecting
     if _worker_client is not None:
         try:
             await _worker_client.disconnect()
