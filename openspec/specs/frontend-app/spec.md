@@ -75,7 +75,7 @@ The frontend SHALL include a floating chat widget that sends messages to the age
 
 #### Scenario: Page context on dashboard
 - **WHEN** the user sends a message from the dashboard
-- **THEN** the context includes: case count, top cases with names, action status, descriptions, pending task names, and draft subjects; stats (pending tasks, drafts to review, resolved cases)
+- **THEN** the context includes: case count, cases listed in work-queue order (action type then priority) with names, priority, action status, descriptions, pending task names, and draft subjects; stats (pending tasks, drafts to review, resolved cases)
 
 #### Scenario: Page context on situation detail
 - **WHEN** the user sends a message from a situation detail page
@@ -175,17 +175,28 @@ SituationCards on the dashboard SHALL display an action-oriented status text der
 - **THEN** the SituationCard shows the count of pending tasks (e.g. "3 actions pending")
 
 ### Requirement: Work-Centric Dashboard
-The dashboard SHALL present a work-item-focused view oriented around case review, rather than raw email display. The human user reviews AI-triaged work — they do not process raw emails.
+The dashboard SHALL present a unified work queue of open cases requiring operator attention, sorted by a composite of action urgency and priority.
 
-#### Scenario: Work queue replaces email feed
+#### Scenario: Unified work queue
 - **WHEN** the dashboard loads
-- **THEN** the center column shows a work queue of all open cases with action status, ordered by priority then recency
-- **AND** does NOT show a flat list of recent emails
+- **THEN** it displays a single "Work Queue" column containing all non-closed cases whose action status is not "done"
+- **AND** cases are sorted first by action type (triage → draft → pending) then by priority within each group (critical → high → medium → low)
+- **AND** each case is rendered as a SituationCard showing urgency dot, action status badge, property name, AI summary, and recency
+
+#### Scenario: Two-column layout
+- **WHEN** the dashboard renders on a wide viewport
+- **THEN** the left area (approx 2/3 width) shows the unified work queue
+- **AND** the right area shows Quick Insights
+- **AND** there are no separate "Critical Queue" or "High Priority" sections
 
 #### Scenario: Work-centric stats
 - **WHEN** the dashboard loads
 - **THEN** QuickStats shows: count of pending tasks, count of draft responses awaiting review, and count of resolved (closed) cases
 - **AND** does NOT show total email count as a primary metric
+
+#### Scenario: Empty state
+- **WHEN** all cases are closed or fully resolved
+- **THEN** the work queue shows an "All caught up" message
 
 ### Requirement: Shifts Page
 The frontend SHALL include a `/shifts` page that gives operators full visibility into the AI's batch email processing — past shifts, current backlog, and the ability to trigger and monitor new shifts.

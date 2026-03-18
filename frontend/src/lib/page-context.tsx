@@ -131,17 +131,29 @@ export function buildDashboardContext(
     cases: CrmCase[],
     stats: { tasks: number; drafts: number; closed: number },
 ): DashboardContext {
-    const openCases = cases.filter(c => c.status !== "closed");
+    const actionOrder: Record<string, number> = { triage: 0, draft: 1, pending: 2, done: 3 };
+    const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+
+    // Unified work-queue order: action type first, then priority within each group
+    const workQueue = cases
+        .filter(c => c.status !== "closed" && !c.name.startsWith("Agent Shift"))
+        .filter(c => caseActionStatus(c).style !== "done")
+        .sort((a, b) => {
+            const actionDiff = (actionOrder[caseActionStatus(a).style] ?? 3) - (actionOrder[caseActionStatus(b).style] ?? 3);
+            if (actionDiff !== 0) return actionDiff;
+            return (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
+        });
+
     return {
         page: "dashboard",
         caseCount: cases.length,
-        openCaseCount: openCases.length,
+        openCaseCount: cases.filter(c => c.status !== "closed").length,
         stats: {
             pendingTasks: stats.tasks,
             draftsToReview: stats.drafts,
             resolvedCases: stats.closed,
         },
-        topCases: openCases.slice(0, 15).map(c => ({
+        topCases: workQueue.slice(0, 15).map(c => ({
             id: c.id,
             name: c.name,
             priority: c.priority,

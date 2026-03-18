@@ -60,15 +60,17 @@ export default function Dashboard() {
     // Filter out internal shift journal cases
     const visibleCases = cases.filter(c => !c.name.startsWith("Agent Shift"));
 
-    const criticalCases = visibleCases.filter(c => priorityToTier(c.priority) === "CRITICAL");
-    const highCases = visibleCases.filter(c => priorityToTier(c.priority) === "HIGH");
-
-    // Work queue: non-closed cases that need attention, ordered by action priority
+    // Unified work queue: non-closed, non-done cases sorted by action type then priority
     const actionOrder = { triage: 0, draft: 1, pending: 2, done: 3 };
+    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     const workQueue = visibleCases
         .filter(c => c.status !== "closed")
         .filter(c => caseActionStatus(c).style !== "done")
-        .sort((a, b) => actionOrder[caseActionStatus(a).style] - actionOrder[caseActionStatus(b).style]);
+        .sort((a, b) => {
+            const actionDiff = actionOrder[caseActionStatus(a).style] - actionOrder[caseActionStatus(b).style];
+            if (actionDiff !== 0) return actionDiff;
+            return (priorityOrder[a.priority as keyof typeof priorityOrder] ?? 2) - (priorityOrder[b.priority as keyof typeof priorityOrder] ?? 2);
+        });
 
     const openCaseCount = cases.filter(c => c.status !== "closed").length;
 
@@ -120,37 +122,10 @@ export default function Dashboard() {
                 )}
 
                 <div ref={dashboardRef} className="grid grid-cols-1 lg:grid-cols-12 gap-4 pt-4">
-                    <div className="lg:col-span-5 flex flex-col gap-4">
+                    <div className="lg:col-span-8">
                         <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
                             <h3 className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">
-                                Critical Queue
-                                <span className="ml-4 h-px flex-1 bg-slate-200"></span>
-                                <span className="ml-4 text-[#EF4444]">{criticalCases.length}</span>
-                            </h3>
-                            <div className="space-y-3">
-                                {criticalCases.map(c => <SituationCard key={c.id} crmCase={c} tier="CRITICAL" />)}
-                                {criticalCases.length === 0 && <p className="text-sm text-slate-400 italic">No critical situations</p>}
-                            </div>
-                        </motion.section>
-
-                        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                            <h3 className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">
-                                High Priority
-                                <span className="ml-4 h-px flex-1 bg-slate-200"></span>
-                                <span className="ml-4 text-[#F59E0B]">{highCases.length}</span>
-                            </h3>
-                            <div className="space-y-3">
-                                {highCases.map(c => <SituationCard key={c.id} crmCase={c} tier="HIGH" />)}
-                                {highCases.length === 0 && <p className="text-sm text-slate-400 italic">No high-priority situations</p>}
-                            </div>
-                        </motion.section>
-                    </div>
-
-                    {/* Center: Work queue — cases needing attention */}
-                    <div className="lg:col-span-4">
-                        <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
-                            <h3 className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">
-                                Needs Your Attention
+                                Work Queue
                                 <span className="ml-4 h-px flex-1 bg-slate-200"></span>
                                 <span className="ml-4 text-[#0000EE]">{workQueue.length}</span>
                             </h3>
@@ -168,7 +143,7 @@ export default function Dashboard() {
                         </motion.section>
                     </div>
 
-                    <div className="lg:col-span-3">
+                    <div className="lg:col-span-4">
                         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 }}>
                             <h3 className="flex items-center text-[12px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-6">
                                 Quick Insights
