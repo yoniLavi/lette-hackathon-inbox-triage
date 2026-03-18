@@ -209,6 +209,11 @@ async def _background_worker_complete(task_id: str) -> None:
         worker_text = await mcp_worker.await_result(task_id, timeout=_RESPONSE_TIMEOUT)
         log.info("[worker-bg] raw result task=%s (%d chars)", task_id, len(worker_text))
 
+        # Drop result if a newer task has superseded this one
+        if _pending_worker_task_id is not None and _pending_worker_task_id != task_id:
+            log.info("[worker-bg] discarding stale result task=%s (current=%s)", task_id, _pending_worker_task_id)
+            return
+
         # Pass through Frontend AI for conversational summary
         if _frontend_ai is not None:
             summary = await _frontend_ai.summarize_worker_result(worker_text)
@@ -218,11 +223,16 @@ async def _background_worker_complete(task_id: str) -> None:
         _pending_worker_result = {"task_id": task_id, "text": summary}
         log.info("[worker-bg] summary ready task=%s (%d chars)", task_id, len(summary))
     except Exception as exc:
+        # Drop error if a newer task has superseded this one
+        if _pending_worker_task_id is not None and _pending_worker_task_id != task_id:
+            log.info("[worker-bg] discarding stale error task=%s (current=%s): %s", task_id, _pending_worker_task_id, exc)
+            return
         log.error("[worker-bg] error task=%s: %s", task_id, exc)
         error_text = f"Sorry, I couldn't fetch that from the CRM: {exc}"
         _pending_worker_result = {"task_id": task_id, "text": error_text}
     finally:
-        _pending_worker_task_id = None
+        if _pending_worker_task_id == task_id:
+            _pending_worker_task_id = None
 
 
 # ---------------------------------------------------------------------------
