@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getCase, getRelatedEmails, getRelatedTasks, getNotes, contactName, senderDisplay, updateCase, updateTask, updateEmail } from "@/lib/crm";
 import type { CrmCase, CrmEmail, CrmTask, CrmNote, CrmContact } from "@/lib/crm";
 import { usePageData, buildSituationContext } from "@/lib/page-context";
+import ReactMarkdown from "react-markdown";
 import { UrgencyBadge } from "@/components/ui/Badge";
 import { ContactBadge } from "@/components/ui/ContactBadge";
 import { Card } from "@/components/ui/Card";
@@ -350,9 +351,9 @@ export default function SituationDetail() {
                                         </h3>
                                     </div>
                                     <div className="p-5">
-                                        <p className="text-[#0F1016] leading-relaxed font-sans text-[15px] whitespace-pre-line">
-                                            {crmCase.description}
-                                        </p>
+                                        <div className="text-[#0F1016] leading-relaxed font-sans text-[15px] prose prose-sm max-w-none">
+                                            <ReactMarkdown>{crmCase.description}</ReactMarkdown>
+                                        </div>
                                     </div>
                                 </Card>
                             </motion.div>
@@ -390,9 +391,9 @@ export default function SituationDetail() {
                                                             </div>
                                                         )}
                                                         {task.description && (
-                                                            <p className="text-sm text-[#0F1016]/80 mt-2 bg-white/50 border border-[#0F1016]/5 p-2 rounded italic">
-                                                                {task.description}
-                                                            </p>
+                                                            <div className="text-sm text-[#0F1016]/80 mt-2 bg-white/50 border border-[#0F1016]/5 p-2 rounded italic prose prose-sm max-w-none">
+                                                                <ReactMarkdown>{task.description}</ReactMarkdown>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </div>

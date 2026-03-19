@@ -46,6 +46,7 @@ type PriorityKey = keyof typeof priorityConfig;
 
 function PrioritySection({ priority, cases, defaultOpen }: { priority: PriorityKey; cases: CrmCase[]; defaultOpen: boolean }) {
     const [open, setOpen] = useState(defaultOpen);
+    const [animating, setAnimating] = useState(false);
     const sectionRef = useRef<HTMLDivElement>(null);
     const config = priorityConfig[priority];
 
@@ -71,14 +72,16 @@ function PrioritySection({ priority, cases, defaultOpen }: { priority: PriorityK
                 <span className="ml-4 h-px flex-1 bg-slate-200"></span>
                 <span className={`ml-4 ${config.color}`}>{cases.length}</span>
             </button>
-            <AnimatePresence initial={false}>
+            <AnimatePresence initial={false} onExitComplete={() => setAnimating(false)}>
                 {open && (
                     <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
+                        onAnimationStart={() => setAnimating(true)}
+                        onAnimationComplete={() => setAnimating(false)}
+                        className={animating ? "overflow-hidden" : ""}
                     >
                         <div className="space-y-3 pb-4">
                             {cases.map(c => (

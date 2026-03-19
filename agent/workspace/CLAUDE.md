@@ -201,8 +201,12 @@ When drafting reply emails:
 When creating Tasks:
 - `name` should be a clear action: "Schedule gas safety inspection for Unit 4B"
 - Set `priority` to match urgency: urgent, normal, or low.
-- Include context in `description` so the property manager can act without re-reading the email.
+- Write `description` as **markdown** (the frontend renders it). Use numbered lists, bold, and line breaks — never pack multiple steps on one line.
 - Set `contact_id` when the relevant contact is known.
+
+## Case description guidance
+
+Write case `description` as **markdown**. Use line breaks, bold, and lists for readability. The frontend renders these fields as markdown.
 
 ## Shift journaling
 

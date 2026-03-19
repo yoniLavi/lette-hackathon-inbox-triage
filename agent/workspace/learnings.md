@@ -110,3 +110,12 @@ Welfare emergency at Graylings Apt 13A: 7-day delay between report and emergency
 2. Automated alerts for overdue critical/urgent tasks
 3. Contact record completeness audits
 4. Clear protocol: welfare emergency = physical check within 2 hours, not email correspondence
+
+## Collective Tenant Action & Planning Law
+
+- **Organized resident petitions** (20+ signatures) require escalation beyond property manager level — needs senior management and legal review
+- Planning objections to neighboring developments involve property law (light rights, boundary issues) and require specialized planning consultant engagement
+- **Developer boundary incursions** during site surveys = trespass matter. Response: verify boundaries, document incursions with photos, issue cease-and-desist if confirmed
+- Resident requests for planning submissions should be evaluated against: (1) legal standing, (2) impact on property rights, (3) duty of care to tenants
+- Timeline commitments for complex legal matters: allow 7-10 business days for management coordination and legal review
+

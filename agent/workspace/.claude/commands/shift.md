@@ -72,7 +72,13 @@ Process unread email threads in the CRM as a batch shift.
 
    **Create Tasks** (when follow-up action is needed):
    ```bash
-   crm tasks create --json '{"name": "<action description>", "status": "not_started", "priority": "<urgent|normal|low>", "description": "<context>", "case_id": <case_id>, "contact_id": <contact_id>}'
+   crm tasks create --json '{"name": "<action description>", "status": "not_started", "priority": "<urgent|normal|low>", "description": "<markdown context>", "case_id": <case_id>, "contact_id": <contact_id>}'
+   ```
+   Write `description` as **markdown** — use numbered lists, bold, line breaks.
+   The frontend renders it as markdown, so `1) foo 2) bar` on one line is unreadable.
+   Instead write:
+   ```
+   1. First action\n2. Second action\n3. Third action
    ```
 
 ### c) Complete the thread

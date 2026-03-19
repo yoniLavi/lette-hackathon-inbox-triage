@@ -72,6 +72,10 @@ export function AIAssistant() {
     const setIsOpen = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
         _setIsOpen(prev => {
             const next = typeof v === "function" ? v(prev) : v;
+            if (!next) {
+                // Clear highlights when chat is closed
+                document.querySelectorAll(".ai-highlight").forEach(el => el.classList.remove("ai-highlight"));
+            }
             saveIsOpen(next);
             return next;
         });
@@ -159,6 +163,10 @@ export function AIAssistant() {
         return name.replace(/_/g, " ");
     };
 
+    const clearHighlights = () => {
+        document.querySelectorAll(".ai-highlight").forEach(el => el.classList.remove("ai-highlight"));
+    };
+
     const executeAction = (action: AIAction) => {
         if (action.action === "navigate") return; // navigate handled separately in sendOne
         const selector = `[data-ai-target="${action.target.type}-${action.target.id}"]`;
@@ -168,14 +176,14 @@ export function AIAssistant() {
             return;
         }
 
+        clearHighlights();
+
         if (action.action === "expand") {
             // Dispatch a custom event that ThreadGroup listens for
             el.dispatchEvent(new CustomEvent("ai-expand", { bubbles: true }));
-            // Give expansion time to render, then scroll
             setTimeout(() => {
                 el.scrollIntoView({ behavior: "smooth", block: "center" });
                 el.classList.add("ai-highlight");
-                el.addEventListener("animationend", () => el.classList.remove("ai-highlight"), { once: true });
             }, 150);
         } else {
             // scrollTo — expand any collapsed parent section first
@@ -183,7 +191,6 @@ export function AIAssistant() {
             setTimeout(() => {
                 el.scrollIntoView({ behavior: "smooth", block: "center" });
                 el.classList.add("ai-highlight");
-                el.addEventListener("animationend", () => el.classList.remove("ai-highlight"), { once: true });
             }, 250);
         }
     };
@@ -283,6 +290,7 @@ export function AIAssistant() {
     };
 
     const handleNewChat = async () => {
+        clearHighlights();
         setMessages([WELCOME_MSG]);
         setLoading(false);
         setStatusText("");
@@ -294,6 +302,8 @@ export function AIAssistant() {
     };
 
     const sendOne = async (text: string) => {
+        clearHighlights();
+
         const userMsg: Message = {
             id: Date.now().toString(),
             role: "user",

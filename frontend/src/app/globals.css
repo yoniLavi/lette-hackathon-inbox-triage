@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme inline {
   --color-background: var(--background);
@@ -100,28 +101,14 @@ body {
   font-weight: 700;
 }
 
-/* AI page action highlight — applied via AIAssistant scrollTo/expand */
-@keyframes ai-highlight-pulse {
-  0% {
-    box-shadow: 0 0 0 4px rgba(0, 0, 238, 0.5), 0 0 20px 8px rgba(0, 0, 238, 0.15);
-    outline: 3px solid rgba(0, 0, 238, 0.7);
-    outline-offset: 3px;
-  }
-  60% {
-    box-shadow: 0 0 0 4px rgba(0, 0, 238, 0.4), 0 0 16px 6px rgba(0, 0, 238, 0.1);
-    outline: 3px solid rgba(0, 0, 238, 0.5);
-    outline-offset: 3px;
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-    outline: 3px solid transparent;
-    outline-offset: 3px;
-  }
-}
-
+/* AI page action highlight — applied via AIAssistant scrollTo/expand.
+   Persistent until cleared by next message or chat close. */
 .ai-highlight {
-  animation: ai-highlight-pulse 3s ease-out forwards;
+  box-shadow: 0 0 0 3px rgba(0, 0, 238, 0.4), 0 0 12px 4px rgba(0, 0, 238, 0.08);
+  outline: 2px solid rgba(0, 0, 238, 0.5);
+  outline-offset: 2px;
   border-radius: 14px;
   position: relative;
   z-index: 10;
+  transition: box-shadow 0.3s, outline-color 0.3s;
 }
