@@ -29,10 +29,10 @@ const WELCOME_MSG: Message = {
 };
 
 const SUGGESTED_PROMPTS = [
-    "Summarize high-priority maintenance",
+    "What needs my attention first?",
+    "Any urgent maintenance issues?",
     "Show me issues for Graylings",
-    "What's the status of this case?",
-    "Draft a response to the tenant"
+    "Are there any overdue tasks?"
 ];
 
 function loadMessages(): Message[] {
