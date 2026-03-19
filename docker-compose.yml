@@ -37,11 +37,9 @@ services:
       AWS_BEARER_TOKEN_BEDROCK: ${AWS_BEARER_TOKEN_BEDROCK}
       AWS_REGION: ${AWS_REGION}
       CRM_API_URL: http://crm-api:8002
+      UV_PROJECT_ENVIRONMENT: /tmp/agent-venv
     volumes:
-      - ./agent/api.py:/app/api.py
-      - ./agent/mcp_worker.py:/app/mcp_worker.py
-      - ./agent/frontend_ai.py:/app/frontend_ai.py
-      - ./agent/entrypoint.sh:/app/entrypoint.sh
+      - ./agent:/app
       - ./agent/workspace:/workspace
       - ./crm-cli:/opt/crm-cli
     ports:
