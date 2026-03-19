@@ -46,12 +46,22 @@ type PriorityKey = keyof typeof priorityConfig;
 
 function PrioritySection({ priority, cases, defaultOpen }: { priority: PriorityKey; cases: CrmCase[]; defaultOpen: boolean }) {
     const [open, setOpen] = useState(defaultOpen);
+    const sectionRef = useRef<HTMLDivElement>(null);
     const config = priorityConfig[priority];
+
+    // Listen for ai-expand events bubbling up from child case cards
+    useEffect(() => {
+        const el = sectionRef.current;
+        if (!el) return;
+        const handler = () => setOpen(true);
+        el.addEventListener("ai-expand", handler);
+        return () => el.removeEventListener("ai-expand", handler);
+    }, []);
 
     if (cases.length === 0) return null;
 
     return (
-        <div>
+        <div ref={sectionRef}>
             <button
                 onClick={() => setOpen(!open)}
                 className="w-full flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3 group cursor-pointer"

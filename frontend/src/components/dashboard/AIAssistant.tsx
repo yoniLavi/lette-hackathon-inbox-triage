@@ -178,10 +178,13 @@ export function AIAssistant() {
                 el.addEventListener("animationend", () => el.classList.remove("ai-highlight"), { once: true });
             }, 150);
         } else {
-            // scrollTo
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-            el.classList.add("ai-highlight");
-            el.addEventListener("animationend", () => el.classList.remove("ai-highlight"), { once: true });
+            // scrollTo — expand any collapsed parent section first
+            el.dispatchEvent(new CustomEvent("ai-expand", { bubbles: true }));
+            setTimeout(() => {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                el.classList.add("ai-highlight");
+                el.addEventListener("animationend", () => el.classList.remove("ai-highlight"), { once: true });
+            }, 250);
         }
     };
 
