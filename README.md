@@ -97,24 +97,33 @@ Built for **BTR/PRS property management** in Ireland (Build-to-Rent / Private Re
 ```
 crm/                    # CRM API service (FastAPI + PostgreSQL)
   main.py               # REST API with generic CRUD + full-text search
-  models.py             # SQLAlchemy models (6 entities)
+  models.py             # SQLAlchemy models (8 entities)
   database.py           # Async engine and session
   Dockerfile            # Python + uv
 crm-cli/                # CRM CLI tool (installed in agent container)
   crm_cli/main.py       # Click-based CLI: crm <entity> <action>
 agent/                  # Agent container (FastAPI + Claude Code SDK)
   api.py                # HTTP API server with session management
+  frontend_ai.py        # Frontend AI (fast Haiku-powered chat)
+  mcp_worker.py         # Async worker dispatch for CRM queries
   pyproject.toml        # Python deps (managed by uv)
   Dockerfile            # Node.js + Python + Claude Code
   entrypoint.sh         # Installs crm-cli, starts uvicorn
+  workspace/            # Agent skills and CLAUDE.md for shift sessions
+frontend/               # Next.js 16 frontend (port 3000)
+  src/app/              # Pages: dashboard, situations, shifts, properties, search
+  src/lib/crm.ts        # CRM data types and fetch functions
+  src/components/        # Dashboard cards, AI chat widget, UI primitives
 scripts/                # Python scripts (run with uv)
   agent.py              # CLI wrapper for the agent API
   seed.py               # Seed CRM with challenge dataset
   reset.py              # Delete all seeded data
   reseed.py             # Reset + seed in one step
   test.sh               # Run integration tests via pytest
-tests/                  # Integration tests
+tests/                  # Integration + E2E tests
   test_agent_api.py     # Agent API tests (health, session, CRM)
+  test_crm_api.py       # CRM API CRUD + search tests
+  test_frontend_e2e.py  # Playwright E2E tests (dashboard, chat, delegation)
 challenge-definition/   # Challenge brief and test data (100 emails JSON)
 openspec/               # Spec-driven development (proposals, specs, tasks)
 ```
