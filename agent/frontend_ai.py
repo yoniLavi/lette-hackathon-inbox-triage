@@ -199,10 +199,14 @@ class FrontendAI:
                 turn, response.stop_reason, len(response.content),
             )
 
-            # Append to conversation history
+            # Append to conversation history (filter empty text blocks)
+            serialized = [_serialize_block(b) for b in response.content]
+            serialized = [b for b in serialized if not (b.get("type") == "text" and not b.get("text"))]
+            if not serialized:
+                serialized = [{"type": "text", "text": "(empty response)"}]
             self.messages.append({
                 "role": "assistant",
-                "content": [_serialize_block(b) for b in response.content],
+                "content": serialized,
             })
 
             # Process content blocks
@@ -318,10 +322,11 @@ class FrontendAI:
         summary = "\n\n".join(text_parts) or result_text  # fallback to raw if empty
 
         # Add the AI's summary to conversation history
-        self.messages.append({
-            "role": "assistant",
-            "content": [{"type": "text", "text": summary}],
-        })
+        if summary:
+            self.messages.append({
+                "role": "assistant",
+                "content": [{"type": "text", "text": summary}],
+            })
 
         log.info("[chat] worker summary: %s", summary[:120])
         return summary
