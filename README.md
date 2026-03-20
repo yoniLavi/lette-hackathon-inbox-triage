@@ -17,18 +17,32 @@ Hackathon project for Lette AI's PropTech challenge (2026-03-07). An agentic AI 
 
 ## Architecture
 
-```
-┌──────────────────┐     ┌─── agent container ───────────────────────┐
-│   Next.js 16     │     │                                           │
-│   Frontend       │     │  ┌─────────────────┐                      │
-│   (port 3000)    │     │  │ FastAPI API      │     crm CLI          │     ┌──────────────┐
-│                  │────▶│  │ (port 8001)      │────(via Bash)────────│────▶│   CRM API    │
-│  AI Chat Widget  │     │  └────┬────────┬────┘                      │     │ (port 8002)  │
-│  (Frontend AI)   │     │       │        │                           │     │ + PostgreSQL │
-└──────────────────┘     │  Frontend AI   Worker AI                   │     └──────────────┘
-                         │  (Sonnet,      (Claude Code SDK,           │
-                         │   direct API)   persistent session)        │
-                         └────────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph Frontend["Next.js 16 · port 3000"]
+        UI[Pages & Components]
+        Chat[AI Chat Widget]
+    end
+
+    subgraph Agent["Agent Container · port 8001"]
+        API[FastAPI API]
+        FrontendAI["Frontend AI\n(Sonnet, direct API)"]
+        Worker["Worker AI\n(Claude Code SDK)"]
+        CLI[crm CLI]
+    end
+
+    subgraph CRM["CRM API · port 8002"]
+        REST[FastAPI REST]
+        DB[(PostgreSQL)]
+    end
+
+    Chat -->|SSE streaming| API
+    UI -->|/api/crm proxy| REST
+    API --> FrontendAI
+    API --> Worker
+    Worker -->|Bash| CLI
+    CLI -->|HTTP| REST
+    REST --> DB
 ```
 
 ### Two-tier AI
