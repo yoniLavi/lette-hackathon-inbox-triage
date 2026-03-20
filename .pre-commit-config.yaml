@@ -14,6 +14,7 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-commit]
+        files: \.(py|ts|tsx|json|yaml|sh)$
 
       - id: e2e-tests
         name: E2E Playwright tests (fast subset)
@@ -21,3 +22,4 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-commit]
+        files: \.(py|ts|tsx|css|json|yaml|sh)$

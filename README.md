@@ -1,58 +1,67 @@
-# PropTech Email Triage Agent
+# Give(a)Lette
 
 Hackathon project for Lette AI's PropTech challenge (2026-03-07). An agentic AI system that helps property managers process high-volume tenant, landlord, and contractor communications.
 
 ## Demo
 
-<div>
-  <a href="https://www.loom.com/share/9943acded24142d4a77b64440f464457">
-    <p>Give(a)Lette - Part 1: Running a shift - Watch Video</p>
-  </a>
-  <a href="https://www.loom.com/share/9943acded24142d4a77b64440f464457">
-    <img style="max-width:300px;" src="https://cdn.loom.com/sessions/thumbnails/9943acded24142d4a77b64440f464457-7c09c766192a55e9-full-play.gif#t=0.1">
-  </a>
-</div>
-
-<div>
-  <a href="https://www.loom.com/share/a7f1ee550f384a27a8f95c30695b3431">
-    <p>Give(a)Lette - Part 2: UI and conversational AI overview - Watch Video</p>
-  </a>
-  <a href="https://www.loom.com/share/a7f1ee550f384a27a8f95c30695b3431">
-    <img style="max-width:300px;" src="https://cdn.loom.com/sessions/thumbnails/a7f1ee550f384a27a8f95c30695b3431-c2d845a5d665b2c5-full-play.gif#t=0.1">
-  </a>
-</div>
+- [Part 1: Running a shift](https://www.loom.com/share/9943acded24142d4a77b64440f464457) — AI batch-processes 100 emails, creates cases, drafts replies, assigns tasks
+- [Part 2: UI and conversational AI overview](https://www.loom.com/share/a7f1ee550f384a27a8f95c30695b3431) — dashboard, inbox, task management, and AI chat assistant
 
 ## What It Does
 
-- Triages incoming emails by urgency and sender type
-- Links related threads and builds context across messages
-- Surfaces recommended actions for the property manager
-- Drafts responses within a real CRM (not isolated AI analysis)
+- **Batch email triage** — AI processes unread email threads in shifts, classifying urgency, creating cases, drafting replies, and assigning tasks
+- **Case management** — links related threads, builds context across messages, tracks resolution
+- **Draft response generation** — composes professional replies referencing specific details, held for human review
+- **Conversational AI assistant** — chat widget that navigates the UI, highlights elements, and answers questions from page context
+- **Full CRM** — properties, contacts, cases, tasks, emails, threads, notes, shifts — all queryable and editable
 
 ## Architecture
 
 ```
-                        ┌─── agent container ───────────────────┐
-┌────────┐   HTTP API   │ ┌─────────────┐                       │
-│ Client │─────────────▶│ │ FastAPI      │     crm CLI           │     ┌──────────────┐
-│        │◀─────────────│ │ (port 8001)  │────(via Bash)─────────│────▶│   CRM API    │
-└────────┘              │ └─────────────┘                       │     │ (port 8002)  │
-                        │       │                               │     │ + PostgreSQL │
-                        │       ▼                               │     └──────────────┘
-                        │  Claude Code SDK                      │
-                        │  (persistent session via Bedrock)     │
-                        └───────────────────────────────────────┘
+┌──────────────────┐     ┌─── agent container ───────────────────────┐
+│   Next.js 16     │     │                                           │
+│   Frontend       │     │  ┌─────────────────┐                      │
+│   (port 3000)    │     │  │ FastAPI API      │     crm CLI          │     ┌──────────────┐
+│                  │────▶│  │ (port 8001)      │────(via Bash)────────│────▶│   CRM API    │
+│  AI Chat Widget  │     │  └────┬────────┬────┘                      │     │ (port 8002)  │
+│  (Frontend AI)   │     │       │        │                           │     │ + PostgreSQL │
+└──────────────────┘     │  Frontend AI   Worker AI                   │     └──────────────┘
+                         │  (Sonnet,      (Claude Code SDK,           │
+                         │   direct API)   persistent session)        │
+                         └────────────────────────────────────────────┘
 ```
 
-The agent runs as a persistent HTTP service. Each prompt is processed within a long-lived Claude Code SDK session that accumulates context. The CRM API (FastAPI + PostgreSQL) is the system of record — all state lives there.
+### Two-tier AI
+
+- **Frontend AI** (Claude Sonnet via Bedrock Messages API) — powers the chat widget. Responds in <5s by answering from page context or navigating the UI. No CRM calls needed for most interactions.
+- **Worker AI** (Claude Code SDK session) — handles batch shift processing and complex CRM queries that require tool use. Delegates from the Frontend AI only when needed (~30s response time).
+
+The Frontend AI has a comprehensive sitemap of all UI pages and prefers navigation over CRM delegation — asking "show me tasks for Graylings" navigates to the property page instantly rather than waiting for a worker query.
 
 ## Tech Stack
 
-- **Docker Compose** — orchestrates the full stack
-- **CRM API** — FastAPI + PostgreSQL with full-text search
+- **Docker Compose** — orchestrates the full stack (PostgreSQL, CRM API, Agent, Frontend)
+- **CRM API** — FastAPI + PostgreSQL with full-text search, 8 entities, generic CRUD
 - **CRM CLI** — `crm` command-line tool for agent ↔ CRM interaction (no MCP overhead)
-- **Claude Code + Anthropic Agent SDK** — agentic AI layer
-- **Python** — seed scripts and utilities
+- **Claude Code SDK** — agentic AI layer for batch shift processing
+- **Anthropic Bedrock API** — direct Messages API for fast Frontend AI responses
+- **Next.js 16** — frontend with dashboard, inbox, tasks, contacts, properties, search, shifts
+- **Python + uv** — seed scripts, integration tests, utilities
+
+## Frontend Pages
+
+| Page | Description |
+|------|-------------|
+| **Dashboard** (`/`) | Priority-grouped open cases, collapsible cards with markdown descriptions, quick insights nav hub |
+| **Inbox** (`/inbox`) | Outlook-style split pane, thread list with search/filters, draft editing with Save/Discard |
+| **Tasks** (`/tasks`) | Task list with status dropdown (Not Started/In Progress/Completed), comments, search |
+| **Cases** (`/cases/[id]`) | Full case detail: tasks with status controls, draft editor, email threads, notes, contacts |
+| **Properties** (`/properties`) | Property cards linking to detail pages |
+| **Property Detail** (`/properties/[id]`) | Open cases, email threads, contacts for a specific property |
+| **Contacts** (`/contacts`) | Searchable directory with type filters (tenant, landlord, contractor, etc.) |
+| **Contact Detail** (`/contacts/[id]`) | Linked cases, assigned tasks, recent emails |
+| **Shifts** (`/shifts`) | Shift history, backlog count, trigger new shift |
+| **Search** (`/search`) | Full-text email search |
 
 ## Getting Started
 
@@ -72,39 +81,30 @@ uv run scripts/seed.py
 #    CRM API is at http://localhost:8002
 ```
 
-### Talking to the agent
+### Running a shift
 
-The agent runs as a persistent API server inside Docker (port 8001). Use the CLI wrapper:
+Trigger an AI shift from the Shifts page in the UI, or via CLI:
 
 ```bash
-# Send a prompt
+uv run scripts/agent.py --shift
+```
+
+The AI processes all unread email threads, creating cases, drafting replies, and assigning tasks. Progress is visible in real-time on the Shifts page.
+
+### CLI tools
+
+```bash
+# Send a prompt to the agent
 uv run scripts/agent.py "List all emails in the CRM"
 
-# Check session status
+# Check session status / restart
 uv run scripts/agent.py --status
-
-# Restart session (clear context)
 uv run scripts/agent.py --restart
-```
 
-Or call the API directly:
-
-```bash
-curl -X POST http://localhost:8001/prompt \
-  -H 'Content-Type: application/json' \
-  -d '{"message": "List all emails"}'
-```
-
-### Other commands
-
-```bash
-# Reset CRM to blank state
-uv run scripts/reset.py
-
-# Reset + re-seed in one step
+# Reset + re-seed CRM data
 uv run scripts/reseed.py
 
-# Run integration tests (stack must be running)
+# Run tests (stack must be running)
 ./scripts/test.sh
 ```
 
@@ -118,41 +118,20 @@ Built for **BTR/PRS property management** in Ireland (Build-to-Rent / Private Re
 crm/                    # CRM API service (FastAPI + PostgreSQL)
   main.py               # REST API with generic CRUD + full-text search
   models.py             # SQLAlchemy models (8 entities)
-  database.py           # Async engine and session
-  Dockerfile            # Python + uv
+  database.py           # Async engine, sessions, lightweight migrations
 crm-cli/                # CRM CLI tool (installed in agent container)
   crm_cli/main.py       # Click-based CLI: crm <entity> <action>
 agent/                  # Agent container (FastAPI + Claude Code SDK)
-  api.py                # HTTP API server with session management
-  frontend_ai.py        # Frontend AI (fast Haiku-powered chat)
+  api.py                # HTTP API, Frontend AI system prompt, session management
+  frontend_ai.py        # Frontend AI — direct Bedrock Messages API client
   mcp_worker.py         # Async worker dispatch for CRM queries
-  pyproject.toml        # Python deps (managed by uv)
-  Dockerfile            # Node.js + Python + Claude Code
-  entrypoint.sh         # Installs crm-cli, starts uvicorn
-  workspace/            # Agent skills and CLAUDE.md for shift sessions
+  workspace/            # Agent skills (shift, triage) and CLAUDE.md
 frontend/               # Next.js 16 frontend (port 3000)
-  src/app/              # Pages: dashboard, situations, shifts, properties, search
-  src/lib/crm.ts        # CRM data types and fetch functions
-  src/components/        # Dashboard cards, AI chat widget, UI primitives
+  src/app/              # Pages: dashboard, inbox, tasks, cases, contacts, properties, shifts, search
+  src/lib/crm.ts        # CRM data types, fetch functions, helpers
+  src/lib/page-context.tsx  # Structured page context for AI chat
+  src/components/       # SituationCard, DraftEditor, AIAssistant, QuickStats, UI primitives
 scripts/                # Python scripts (run with uv)
-  agent.py              # CLI wrapper for the agent API
-  seed.py               # Seed CRM with challenge dataset
-  reset.py              # Delete all seeded data
-  reseed.py             # Reset + seed in one step
-  test.sh               # Run integration tests via pytest
-tests/                  # Integration + E2E tests
-  test_agent_api.py     # Agent API tests (health, session, CRM)
-  test_crm_api.py       # CRM API CRUD + search tests
-  test_frontend_e2e.py  # Playwright E2E tests (dashboard, chat, delegation)
-challenge-definition/   # Challenge brief and test data (100 emails JSON)
+tests/                  # Integration (CRM + agent API) + Playwright E2E tests
 openspec/               # Spec-driven development (proposals, specs, tasks)
 ```
-
-## Challenge
-
-Property managers deal with large volumes of communication from tenants, landlords, contractors, and prospects. The system must:
-
-1. Identify who messages are from
-2. Understand context across threads
-3. Assess urgency
-4. Surface clear recommended actions

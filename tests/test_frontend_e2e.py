@@ -304,7 +304,7 @@ def test_non_blocking_delegation(page: Page):
 def test_response_renders_markdown(page: Page):
     """AI responses are rendered through ReactMarkdown (not plain text)."""
     open_chat(page)
-    n = send_message(page, "What does BTR stand for?")
+    n = send_message(page, "Summarize the top 3 cases on this dashboard")
     wait_for_response(page, timeout=FAST_TIMEOUT, prev_count=n)
 
     # ReactMarkdown wraps content in <p> tags — verify rendering pipeline works
