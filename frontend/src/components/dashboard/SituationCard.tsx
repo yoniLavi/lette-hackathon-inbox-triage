@@ -59,7 +59,7 @@ export function SituationCard({ crmCase, tier }: { crmCase: CrmCase; tier: Urgen
                         <div className="flex justify-between items-start">
                             <div className="space-y-0.5 flex-1">
                                 <h3 className="text-[18px] font-serif font-medium text-[#0F1016] leading-tight group-hover:text-[#0000EE] transition-colors">
-                                    <Link href={`/situations/${crmCase.id}`} className="hover:underline">
+                                    <Link href={`/cases/${crmCase.id}`} className="hover:underline">
                                         {crmCase.name}
                                     </Link>
                                 </h3>
@@ -101,7 +101,7 @@ export function SituationCard({ crmCase, tier }: { crmCase: CrmCase; tier: Urgen
                                     {expanded ? "Less" : "More"}
                                 </button>
                             )}
-                            <Link href={`/situations/${crmCase.id}`} className="ml-auto">
+                            <Link href={`/cases/${crmCase.id}`} className="ml-auto">
                                 <Button
                                     variant="ghost"
                                     className="h-7 px-3 text-[10px] font-bold uppercase tracking-widest hover:bg-[#0F1016] hover:text-white transition-all rounded-full"

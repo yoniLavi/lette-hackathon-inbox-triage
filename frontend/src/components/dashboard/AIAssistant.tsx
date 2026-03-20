@@ -56,11 +56,19 @@ function saveIsOpen(open: boolean) {
 }
 
 /** Map a navigate action target to a URL path. */
-function navigatePath(target: { type: string; id?: string }): string | null {
+function navigatePath(target: { type: string; id?: string; query?: string }): string | null {
     switch (target.type) {
-        case "situation": return target.id ? `/situations/${target.id}` : null;
+        case "case": return target.id ? `/cases/${target.id}` : null;
+        case "situation": return target.id ? `/cases/${target.id}` : null; // legacy alias
         case "dashboard": return "/";
         case "properties": return "/properties";
+        case "property": return target.id ? `/properties/${target.id}` : "/properties";
+        case "contacts": return "/contacts";
+        case "contact": return target.id ? `/contacts/${target.id}` : "/contacts";
+        case "inbox": return target.id ? `/inbox?email=${target.id}` : "/inbox";
+        case "tasks": return "/tasks";
+        case "search": return target.query ? `/search?q=${encodeURIComponent(target.query)}` : "/search";
+        case "shifts": return "/shifts";
         default: return null;
     }
 }
@@ -97,6 +105,28 @@ export function AIAssistant() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const queuedMessage = useRef<string | null>(null);
     const loadingRef = useRef(false);
+
+    // Drag state
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const dragging = useRef(false);
+    const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
+
+    useEffect(() => {
+        const onMove = (e: MouseEvent) => {
+            if (!dragging.current) return;
+            setDragOffset({
+                x: dragStart.current.ox + (e.clientX - dragStart.current.x),
+                y: dragStart.current.oy + (e.clientY - dragStart.current.y),
+            });
+        };
+        const onUp = () => { dragging.current = false; };
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+        return () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+        };
+    }, []);
     const pageDataRef = useRef(pageData);
 
     // Keep pageDataRef in sync with latest pageData
@@ -335,17 +365,16 @@ export function AIAssistant() {
                     const newContext = await waitForContextUpdate();
                     console.log("[chat] new context after navigation (%d chars)", newContext.length);
 
-                    // Send follow-up with new context for the AI to answer
+                    // Send follow-up with new context for the AI to answer from
                     const followupBody = JSON.stringify({
                         message: "[Context update after navigation — answer the user's original question using this new page context. Use page_action scrollTo to highlight the most relevant element.]",
                         context: newContext || undefined,
                     });
                     const followup = await processStream(`${AGENT_URL}/prompt/stream`, followupBody);
 
-                    // Always show a response — use first turn's text as fallback
                     const finalText = followup.response && followup.response !== "(no response)"
                         ? followup.response
-                        : response || "I've navigated to the page.";
+                        : response || "Done — I've opened the page.";
 
                     setMessages(prev => [...prev, {
                         id: (Date.now() + 1).toString(),
@@ -357,7 +386,6 @@ export function AIAssistant() {
                     if (followup.workerTaskId) {
                         setWorkerTaskId(followup.workerTaskId);
                     }
-                    // Execute any action from the follow-up (e.g., scrollTo on the new page)
                     if (followup.action) {
                         setTimeout(() => executeAction(followup.action!), 100);
                     }
@@ -432,14 +460,26 @@ export function AIAssistant() {
         <div className="fixed bottom-8 right-8 z-[100]">
             <AnimatePresence>
                 {isOpen && (
+                    <div
+                        className="absolute bottom-20 right-0"
+                        style={{ transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
+                    >
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                        className="absolute bottom-20 right-0 w-[calc(100vw-32px)] sm:w-[400px] h-[600px] max-h-[70vh] bg-white rounded-[32px] shadow-2xl border border-[#0F1016]/5 flex flex-col overflow-hidden"
+                        className="w-[calc(100vw-32px)] sm:w-[400px] h-[600px] max-h-[70vh] bg-white rounded-[32px] shadow-2xl border border-[#0F1016]/5 flex flex-col overflow-hidden"
                     >
-                        {/* Header */}
-                        <div className="p-6 bg-[#0F1016] text-white flex justify-between items-center">
+                        {/* Header — draggable */}
+                        <div
+                            className="p-6 bg-[#0F1016] text-white flex justify-between items-center cursor-grab active:cursor-grabbing select-none"
+                            onMouseDown={(e) => {
+                                // Don't start drag if clicking a button
+                                if ((e.target as HTMLElement).closest("button")) return;
+                                dragging.current = true;
+                                dragStart.current = { x: e.clientX, y: e.clientY, ox: dragOffset.x, oy: dragOffset.y };
+                            }}
+                        >
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-[#0000EE] flex items-center justify-center text-white">
                                     <Sparkles className="w-4 h-4" />
@@ -582,6 +622,7 @@ export function AIAssistant() {
                             </form>
                         </div>
                     </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
 

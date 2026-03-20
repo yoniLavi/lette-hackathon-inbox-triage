@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { getCases, getCounts, getDraftCount, getUnreadThreads } from "@/lib/crm";
+import { getCases, getCounts, getDraftCount, getUnreadThreads, getContacts } from "@/lib/crm";
 import type { CrmCase } from "@/lib/crm";
 import { caseActionStatus } from "@/lib/crm";
 import { usePageData, buildDashboardContext } from "@/lib/page-context";
@@ -101,6 +101,7 @@ export default function Dashboard() {
     const [cases, setCases] = useState<CrmCase[]>([]);
     const [stats, setStats] = useState({ tasks: 0, drafts: 0, closed: 0 });
     const [unreadCount, setUnreadCount] = useState(0);
+    const [contactCount, setContactCount] = useState(0);
     const { setData } = usePageData();
 
     useEffect(() => {
@@ -109,9 +110,11 @@ export default function Dashboard() {
             getCounts().catch(() => ({ emails: 0, open_tasks: 0, closed_cases: 0 })),
             getDraftCount().catch(() => 0),
             getUnreadThreads().catch(() => ({ threads: [], total: 0 })),
-        ]).then(([c, counts, draftCount, unread]) => {
+            getContacts().catch(() => []),
+        ]).then(([c, counts, draftCount, unread, contacts]) => {
             setCases(c);
             setUnreadCount(unread.total);
+            setContactCount(contacts.length);
             const s = { tasks: counts.open_tasks, drafts: draftCount, closed: counts.closed_cases };
             setStats(s);
             setData(buildDashboardContext(c, s));
@@ -229,7 +232,14 @@ export default function Dashboard() {
                                 Quick Insights
                                 <span className="ml-4 h-px flex-1 bg-slate-200"></span>
                             </h3>
-                            <QuickStats taskCount={stats.tasks} draftCount={stats.drafts} closedCount={stats.closed} />
+                            <QuickStats
+                                taskCount={stats.tasks}
+                                draftCount={stats.drafts}
+                                unreadCount={unreadCount}
+                                contactCount={contactCount}
+                                cases={visibleCases}
+                                loaded={cases.length > 0}
+                            />
                         </motion.div>
                     </div>
                 </div>

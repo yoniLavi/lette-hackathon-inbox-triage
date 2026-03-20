@@ -38,7 +38,10 @@ export default function RootLayout({
             <Logo />
             <div className="flex items-center gap-4">
               <Link href="/" className="text-xs font-sans font-bold uppercase tracking-[0.15em] text-[#0F1016]/40 hover:text-[#0000EE] transition-colors">Dashboard</Link>
+              <Link href="/inbox" className="text-xs font-sans font-bold uppercase tracking-[0.15em] text-[#0F1016]/40 hover:text-[#0000EE] transition-colors">Inbox</Link>
               <Link href="/properties" className="text-xs font-sans font-bold uppercase tracking-[0.15em] text-[#0F1016]/40 hover:text-[#0000EE] transition-colors">Properties</Link>
+              <Link href="/tasks" className="text-xs font-sans font-bold uppercase tracking-[0.15em] text-[#0F1016]/40 hover:text-[#0000EE] transition-colors">Tasks</Link>
+              <Link href="/contacts" className="text-xs font-sans font-bold uppercase tracking-[0.15em] text-[#0F1016]/40 hover:text-[#0000EE] transition-colors">Contacts</Link>
               <Link href="/shifts" className="text-xs font-sans font-bold uppercase tracking-[0.15em] text-[#0F1016]/40 hover:text-[#0000EE] transition-colors">Shifts</Link>
             </div>
           </div>

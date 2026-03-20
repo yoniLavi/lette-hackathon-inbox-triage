@@ -37,7 +37,7 @@ FILTERS: dict[str, list[str]] = {
     ],
     "cases": ["status", "priority", "property_id"],
     "tasks": ["status", "priority", "case_id", "contact_id"],
-    "notes": ["case_id", "shift_id"],
+    "notes": ["case_id", "shift_id", "task_id"],
     "threads": ["is_read", "case_id", "property_id", "contact_id"],
     "shifts": ["status"],
 }

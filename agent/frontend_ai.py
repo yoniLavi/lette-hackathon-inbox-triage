@@ -66,16 +66,25 @@ TOOLS = [
                     "properties": {
                         "type": {
                             "type": "string",
-                            "enum": ["case", "email", "thread", "task", "draft", "note", "situation", "dashboard", "properties"],
+                            "enum": [
+                                "case", "email", "thread", "task", "draft", "note",
+                                "dashboard", "properties", "property", "contacts", "contact",
+                                "inbox", "tasks", "search", "shifts",
+                            ],
                             "description": (
-                                "For scrollTo: case (on dashboard), email, thread, task, draft, note (on situation pages). "
-                                "For expand: thread. "
-                                "For navigate: situation (requires id), dashboard, properties."
+                                "scrollTo targets: case (dashboard), email, thread, task, draft, note (case pages). "
+                                "expand targets: thread. "
+                                "navigate targets: case (id required), dashboard, properties, property (id), "
+                                "contacts, contact (id), inbox (id = email id), tasks, search (query), shifts."
                             ),
                         },
                         "id": {
                             "type": "string",
-                            "description": "The element ID. Required for scrollTo/expand and navigate to situation.",
+                            "description": "Element/entity ID. Required for scrollTo, expand, and navigate to case/property/contact/inbox.",
+                        },
+                        "query": {
+                            "type": "string",
+                            "description": "Search query. Only for navigate to search.",
                         },
                     },
                     "required": ["type"],
@@ -181,6 +190,7 @@ class FrontendAI:
         pending_task_id: str | None = None
         page_action: PageAction | None = None
         final_text = "(no response)"
+        all_text_parts: list[str] = []
 
         for turn in range(self.max_turns):
             log.info("[chat] turn %d — calling Messages API...", turn)
@@ -210,12 +220,11 @@ class FrontendAI:
             })
 
             # Process content blocks
-            text_parts: list[str] = []
             tool_uses: list[Any] = []
 
             for block in response.content:
                 if block.type == "text" and block.text:
-                    text_parts.append(block.text)
+                    all_text_parts.append(block.text)
                     log.info("[chat] text: %s...", block.text[:80])
                     if sse_queue:
                         await sse_queue.put(
@@ -227,7 +236,7 @@ class FrontendAI:
 
             # No tool calls → done
             if response.stop_reason != "tool_use" or not tool_uses:
-                final_text = "\n\n".join(text_parts) or "(no response)"
+                final_text = "\n\n".join(all_text_parts) or "(no response)"
                 break
 
             # Execute tools

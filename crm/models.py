@@ -127,6 +127,7 @@ class Note(Base):
     content = Column(Text)
     case_id = Column(Integer, ForeignKey("cases.id"))
     shift_id = Column(Integer, ForeignKey("shifts.id"))
+    task_id = Column(Integer, ForeignKey("tasks.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
 

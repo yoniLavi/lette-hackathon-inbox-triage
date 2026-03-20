@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState } from "react";
-import type { CrmCase, CrmEmail, CrmTask, CrmNote, CrmContact, CrmProperty } from "./crm";
+import type { CrmCase, CrmEmail, CrmTask, CrmNote, CrmContact, CrmProperty, CrmThread } from "./crm";
 import { contactName, caseActionStatus, senderDisplay } from "./crm";
 
 // ---------- Types for structured page context ----------
@@ -99,11 +99,61 @@ interface SearchContext {
     }[];
 }
 
+interface InboxContext {
+    page: "inbox";
+    threadCount: number;
+    unreadCount: number;
+    draftCount: number;
+    threads: { threadId: string; subject: string; sender: string; emailCount: number; isRead: boolean; hasDraft: boolean; caseId?: number }[];
+}
+
+interface TasksContext {
+    page: "tasks";
+    totalTasks: number;
+    pendingCount: number;
+    completedCount: number;
+    tasks: { id: number; name: string; status: string; priority: string; caseName?: string; description?: string }[];
+}
+
+interface ContactsContext {
+    page: "contacts";
+    totalContacts: number;
+    contacts: { id: number; name: string; type: string; email: string; propertyName?: string; unit?: string; company?: string }[];
+}
+
+interface PropertyDetailContext {
+    page: "propertyDetail";
+    propertyId: number;
+    propertyName: string;
+    type: string;
+    units: number;
+    manager: string;
+    managerEmail: string;
+    openCaseCount: number;
+    openCases: { id: number; name: string; priority: string; status: string; actionStatus: string; description?: string }[];
+    contactCount: number;
+    contacts: { id: number; name: string; type: string; email: string; unit?: string }[];
+}
+
+interface ContactDetailContext {
+    page: "contactDetail";
+    contactId: number;
+    contactName: string;
+    contactType: string;
+    email: string;
+    propertyName?: string;
+    unit?: string;
+    company?: string;
+    openCaseCount: number;
+    openCases: { id: number; name: string; priority: string; description?: string }[];
+    recentEmails: { id: number; subject: string; dateSent: string }[];
+}
+
 interface GenericContext {
     page: string;
 }
 
-export type PageData = DashboardContext | SituationContext | PropertiesContext | SearchContext | GenericContext;
+export type PageData = DashboardContext | SituationContext | PropertiesContext | SearchContext | InboxContext | TasksContext | ContactsContext | PropertyDetailContext | ContactDetailContext | GenericContext;
 
 // ---------- Context ----------
 
@@ -264,6 +314,130 @@ export function buildSearchContext(
             dateSent: e.date_sent,
             bodySnippet: (e.body_plain || e.body || "").replace(/<[^>]*>/g, '').slice(0, 200) || undefined,
             caseId: e.case_id,
+        })),
+    };
+}
+
+export function buildInboxContext(
+    threads: CrmThread[],
+): InboxContext {
+    return {
+        page: "inbox",
+        threadCount: threads.length,
+        unreadCount: threads.filter(t => !t.is_read).length,
+        draftCount: threads.filter(t => t.emails?.some(e => e.status === "draft")).length,
+        threads: threads.slice(0, 30).map(t => ({
+            threadId: t.thread_id,
+            subject: t.subject,
+            sender: contactName(t.contact) || "Unknown",
+            emailCount: t.email_count,
+            isRead: t.is_read,
+            hasDraft: t.emails?.some(e => e.status === "draft") || false,
+            caseId: t.case_id,
+        })),
+    };
+}
+
+export function buildTasksContext(
+    tasks: CrmTask[],
+    cases: Record<number, CrmCase>,
+): TasksContext {
+    return {
+        page: "tasks",
+        totalTasks: tasks.length,
+        pendingCount: tasks.filter(t => t.status !== "completed").length,
+        completedCount: tasks.filter(t => t.status === "completed").length,
+        tasks: tasks.slice(0, 30).map(t => ({
+            id: t.id,
+            name: t.name,
+            status: t.status,
+            priority: t.priority,
+            caseName: t.case_id ? cases[t.case_id]?.name : undefined,
+            description: t.description ? t.description.slice(0, 200) : undefined,
+        })),
+    };
+}
+
+export function buildContactsContext(
+    contacts: CrmContact[],
+    properties: Record<number, CrmProperty>,
+): ContactsContext {
+    return {
+        page: "contacts",
+        totalContacts: contacts.length,
+        contacts: contacts.slice(0, 40).map(c => ({
+            id: c.id,
+            name: contactName(c) || c.email,
+            type: c.type,
+            email: c.email,
+            propertyName: c.property_id ? properties[c.property_id]?.name : undefined,
+            unit: c.unit || undefined,
+            company: c.company || undefined,
+        })),
+    };
+}
+
+export function buildPropertyDetailContext(
+    property: CrmProperty,
+    cases: CrmCase[],
+    contacts: CrmContact[],
+): PropertyDetailContext {
+    const openCases = cases.filter(c => c.status !== "closed" && !c.name.startsWith("Agent Shift"));
+    return {
+        page: "propertyDetail",
+        propertyId: property.id,
+        propertyName: property.name,
+        type: property.type,
+        units: property.units,
+        manager: property.manager,
+        managerEmail: property.manager_email,
+        openCaseCount: openCases.length,
+        openCases: openCases.slice(0, 20).map(c => ({
+            id: c.id,
+            name: c.name,
+            priority: c.priority,
+            status: c.status,
+            actionStatus: caseActionStatus(c).text,
+            description: c.description ? c.description.slice(0, 200) : undefined,
+        })),
+        contactCount: contacts.length,
+        contacts: contacts.slice(0, 20).map(c => ({
+            id: c.id,
+            name: contactName(c) || c.email,
+            type: c.type,
+            email: c.email,
+            unit: c.unit || undefined,
+        })),
+    };
+}
+
+export function buildContactDetailContext(
+    contact: CrmContact,
+    cases: CrmCase[],
+    emails: CrmEmail[],
+    propertyName?: string,
+): ContactDetailContext {
+    const openCases = cases.filter(c => c.status !== "closed" && !c.name.startsWith("Agent Shift"));
+    return {
+        page: "contactDetail",
+        contactId: contact.id,
+        contactName: contactName(contact) || contact.email,
+        contactType: contact.type,
+        email: contact.email,
+        propertyName,
+        unit: contact.unit || undefined,
+        company: contact.company || undefined,
+        openCaseCount: openCases.length,
+        openCases: openCases.slice(0, 15).map(c => ({
+            id: c.id,
+            name: c.name,
+            priority: c.priority,
+            description: c.description ? c.description.slice(0, 200) : undefined,
+        })),
+        recentEmails: emails.slice(0, 15).map(e => ({
+            id: e.id,
+            subject: e.subject,
+            dateSent: e.date_sent,
         })),
     };
 }

@@ -93,7 +93,7 @@ export default function SearchPage() {
                                 </Card>
                             );
                             return email.case_id ? (
-                                <Link key={email.id} href={`/situations/${email.case_id}`}>{inner}</Link>
+                                <Link key={email.id} href={`/cases/${email.case_id}`}>{inner}</Link>
                             ) : (
                                 <div key={email.id}>{inner}</div>
                             );

@@ -9,6 +9,7 @@ import { usePageData, buildSituationContext } from "@/lib/page-context";
 import ReactMarkdown from "react-markdown";
 import { UrgencyBadge } from "@/components/ui/Badge";
 import { ContactBadge } from "@/components/ui/ContactBadge";
+import { DraftEditor } from "@/components/dashboard/DraftEditor";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { motion } from "framer-motion";
@@ -160,26 +161,9 @@ function ThreadGroup({ threadEmails }: { threadEmails: CrmEmail[] }) {
     );
 }
 
-function DraftCard({ draft, onUpdate }: { draft: CrmEmail; onUpdate: (e: CrmEmail) => void }) {
-    const [editing, setEditing] = useState(false);
-    const [editBody, setEditBody] = useState(draft.body?.replace(/<[^>]*>/g, '') || "");
-    const [saving, setSaving] = useState(false);
-
-    const handleSave = async () => {
-        setSaving(true);
-        try {
-            await updateEmail(draft.id, { body: editBody, body_plain: editBody });
-            onUpdate({ ...draft, body: editBody, body_plain: editBody });
-            setEditing(false);
-        } catch (e) {
-            console.error("Failed to save draft:", e);
-        } finally {
-            setSaving(false);
-        }
-    };
-
+function DraftCard({ draft, onUpdate, onDiscard }: { draft: CrmEmail; onUpdate: (e: CrmEmail) => void; onDiscard: () => void }) {
     return (
-        <Card data-ai-target={`draft-${draft.id}`} className="shadow-sm border-transparent bg-[#F2F2EC] mb-4">
+        <Card data-ai-target={`draft-${draft.id}`} className="shadow-sm border-transparent bg-[#F2F2EC] mb-4 overflow-hidden">
             <div className="border-b border-[#0F1016]/5 p-3 px-4 flex justify-between items-center bg-violet-50 rounded-t-xl">
                 <h3 className="font-bold text-violet-700 flex items-center text-[10px] tracking-[0.2em] uppercase">
                     Draft Response
@@ -189,34 +173,7 @@ function DraftCard({ draft, onUpdate }: { draft: CrmEmail; onUpdate: (e: CrmEmai
                 <div className="flex font-medium"><span className="w-16 text-[#0F1016]/40 font-bold uppercase text-[10px] pt-0.5">To:</span> <span className="text-[#0F1016]">{(draft.to_addresses || []).join(", ")}</span></div>
                 <div className="flex font-medium"><span className="w-16 text-[#0F1016]/40 font-bold uppercase text-[10px] pt-0.5">Subject:</span> <span className="text-[#0F1016]">{draft.subject}</span></div>
             </div>
-            {editing ? (
-                <textarea
-                    value={editBody}
-                    onChange={(e) => setEditBody(e.target.value)}
-                    className="w-full p-4 bg-white font-sans text-sm text-[#0F1016] leading-relaxed min-h-[120px] resize-y outline-none focus:ring-2 focus:ring-[#0000EE]/20"
-                    autoFocus
-                />
-            ) : (
-                <div className="p-4 bg-white/50 font-sans text-sm text-[#0F1016]/80 leading-relaxed italic whitespace-pre-line">
-                    {draft.body?.replace(/<[^>]*>/g, '') || ""}
-                </div>
-            )}
-            <div className="p-3 bg-[#0F1016]/5 rounded-b-xl border-t border-[#0F1016]/5 flex justify-end items-center">
-                {editing ? (
-                    <div className="flex gap-2">
-                        <Button variant="secondary" size="sm" className="rounded-full shadow-sm text-[10px] font-bold uppercase tracking-wider" onClick={() => { setEditing(false); setEditBody(draft.body?.replace(/<[^>]*>/g, '') || ""); }}>
-                            <X className="w-3 h-3 mr-1" /> Cancel
-                        </Button>
-                        <Button size="sm" className="rounded-full shadow-sm text-[10px] font-bold uppercase tracking-wider" onClick={handleSave} disabled={saving}>
-                            <Check className="w-3 h-3 mr-1" /> {saving ? "Saving..." : "Save"}
-                        </Button>
-                    </div>
-                ) : (
-                    <Button variant="secondary" size="sm" className="rounded-full shadow-sm text-[10px] font-bold uppercase tracking-wider" onClick={() => setEditing(true)}>
-                        <Pencil className="w-3 h-3 mr-1" /> Edit
-                    </Button>
-                )}
-            </div>
+            <DraftEditor email={draft} onUpdate={onUpdate} onDiscard={onDiscard} />
         </Card>
     );
 }
@@ -295,16 +252,35 @@ export default function SituationDetail() {
                     </Link>
                     <div className="flex gap-3">
                         {crmCase.status !== "closed" ? (
-                            <Button
-                                size="fixed"
-                                className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white px-4 py-1.5 rounded-full shadow-sm text-sm hover:-translate-y-0.5 transition-all"
-                                onClick={async () => {
-                                    await updateCase(crmCase.id, { status: "closed" });
-                                    setCrmCase({ ...crmCase, status: "closed" });
-                                }}
-                            >
-                                <Check className="w-4 h-4 mr-1.5" /> Close Case
-                            </Button>
+                            (() => {
+                                const pendingTasks = tasks.filter(t => t.status !== "completed");
+                                const draftCount = emails.filter(e => e.status === "draft").length;
+                                const blocked = pendingTasks.length > 0 || draftCount > 0;
+                                const reason = blocked
+                                    ? `Cannot close: ${pendingTasks.length ? `${pendingTasks.length} task${pendingTasks.length > 1 ? "s" : ""} pending` : ""}${pendingTasks.length && draftCount ? " and " : ""}${draftCount ? `${draftCount} unsent draft${draftCount > 1 ? "s" : ""}` : ""}`
+                                    : "";
+                                return (
+                                    <div className="relative group">
+                                        <Button
+                                            size="fixed"
+                                            className={`px-4 py-1.5 rounded-full shadow-sm text-sm transition-all ${blocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white hover:-translate-y-0.5"}`}
+                                            disabled={blocked}
+                                            onClick={async () => {
+                                                if (blocked) return;
+                                                await updateCase(crmCase.id, { status: "closed" });
+                                                setCrmCase({ ...crmCase, status: "closed" });
+                                            }}
+                                        >
+                                            <Check className="w-4 h-4 mr-1.5" /> Close Case
+                                        </Button>
+                                        {blocked && (
+                                            <div className="absolute top-full right-0 mt-1.5 px-3 py-2 bg-[#0F1016] text-white text-[11px] font-sans rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                                {reason}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()
                         ) : (
                             <span className="px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-sm font-bold border border-emerald-200">Closed</span>
                         )}
@@ -372,24 +348,36 @@ export default function SituationDetail() {
                                         {tasks.map((task, i) => (
                                             <div key={task.id} data-ai-target={`task-${task.id}`} className={`p-4 hover:bg-white/30 transition-colors ${i < tasks.length - 1 ? "border-b border-[#0F1016]/5" : ""}`}>
                                                 <div className="flex items-start gap-3">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="mt-1 rounded border-[#0F1016]/20 text-[#0000EE] focus:ring-[#0000EE] w-4 h-4 cursor-pointer"
-                                                        checked={task.status === "completed"}
-                                                        onChange={async () => {
-                                                            const newStatus = task.status === "completed" ? "not_started" : "completed";
-                                                            await updateTask(task.id, { status: newStatus });
-                                                            setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
-                                                        }}
-                                                    />
+                                                    <div className="mt-0.5">
+                                                        <select
+                                                            value={task.status}
+                                                            onChange={async (e) => {
+                                                                const newStatus = e.target.value;
+                                                                await updateTask(task.id, { status: newStatus });
+                                                                setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+                                                            }}
+                                                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border outline-none cursor-pointer ${
+                                                                task.status === "completed" ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                                                                : task.status === "in_progress" ? "bg-amber-50 text-amber-600 border-amber-200"
+                                                                : "bg-slate-50 text-slate-500 border-slate-200"
+                                                            }`}
+                                                        >
+                                                            <option value="not_started">Not Started</option>
+                                                            <option value="in_progress">In Progress</option>
+                                                            <option value="completed">Completed</option>
+                                                        </select>
+                                                    </div>
                                                     <div className="flex-1">
-                                                        <h4 className="font-bold text-[#0F1016] text-sm">{task.name}</h4>
-                                                        {task.priority && (
-                                                            <div className="flex text-[10px] font-bold uppercase tracking-wider text-[#0F1016]/60 gap-3 mt-1.5 font-sans">
+                                                        <h4 className={`font-bold text-sm ${task.status === "completed" ? "text-[#0F1016]/40 line-through" : "text-[#0F1016]"}`}>{task.name}</h4>
+                                                        <div className="flex flex-wrap text-[10px] font-bold uppercase tracking-wider text-[#0F1016]/60 gap-2 mt-1.5 font-sans">
+                                                            {task.priority && (
                                                                 <span className="px-1.5 py-0.5 rounded bg-white border border-[#0F1016]/5">Priority: {task.priority}</span>
-                                                                {task.date_end && <span className="px-1.5 py-0.5 rounded bg-white border border-[#0F1016]/5">Due: {new Date(task.date_end).toLocaleDateString()}</span>}
-                                                            </div>
-                                                        )}
+                                                            )}
+                                                            {task.date_end && <span className="px-1.5 py-0.5 rounded bg-white border border-[#0F1016]/5">Due: {new Date(task.date_end).toLocaleDateString()}</span>}
+                                                            <Link href="/tasks" className="px-1.5 py-0.5 rounded bg-[#0000EE]/5 text-[#0000EE] border border-[#0000EE]/10 hover:bg-[#0000EE]/10 transition-colors">
+                                                                View in Tasks →
+                                                            </Link>
+                                                        </div>
                                                         {task.description && (
                                                             <div className="text-sm text-[#0F1016]/80 mt-2 bg-white/50 border border-[#0F1016]/5 p-2 rounded italic prose prose-sm max-w-none">
                                                                 <ReactMarkdown>{task.description}</ReactMarkdown>
@@ -410,6 +398,8 @@ export default function SituationDetail() {
                                 {draftEmails.map(draft => (
                                     <DraftCard key={draft.id} draft={draft} onUpdate={(updated) => {
                                         setEmails(prev => prev.map(e => e.id === updated.id ? updated : e));
+                                    }} onDiscard={() => {
+                                        setEmails(prev => prev.filter(e => e.id !== draft.id));
                                     }} />
                                 ))}
                             </motion.div>

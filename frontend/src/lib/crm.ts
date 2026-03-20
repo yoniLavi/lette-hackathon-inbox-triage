@@ -106,6 +106,7 @@ export interface CrmNote {
     content: string;
     case_id?: number;
     shift_id?: number;
+    task_id?: number;
     created_at: string;
     updated_at: string;
 }
@@ -167,6 +168,14 @@ export async function updateCase(id: number, data: Record<string, unknown>) {
 
 export async function updateTask(id: number, data: Record<string, unknown>) {
     return crmPatch(`tasks/${id}`, data);
+}
+
+export async function deleteEmail(id: number) {
+    const url = new URL("/api/crm", window.location.origin);
+    url.searchParams.set("path", `emails/${id}`);
+    const res = await fetch(url.toString(), { method: "DELETE", cache: "no-store" });
+    if (!res.ok) throw new Error(`Delete email: ${res.status}`);
+    return res.json();
 }
 
 export async function updateEmail(id: number, data: Record<string, unknown>) {
@@ -237,6 +246,14 @@ export async function searchEmails(query: string, limit = 20): Promise<CrmEmail[
     return data.list || [];
 }
 
+export async function getProperty(id: number): Promise<CrmProperty> {
+    return crmFetch(`properties/${id}`);
+}
+
+export async function getContact(id: number): Promise<CrmContact> {
+    return crmFetch(`contacts/${id}`);
+}
+
 export async function getProperties(): Promise<CrmProperty[]> {
     const data = await crmFetch("properties", {
         order_by: "name",
@@ -287,6 +304,29 @@ export async function getNotes(caseId: number): Promise<CrmNote[]> {
     return data.list || [];
 }
 
+export async function getTaskNotes(taskId: number): Promise<CrmNote[]> {
+    const data = await crmFetch("notes", {
+        task_id: String(taskId),
+        order_by: "created_at",
+        order: "asc",
+        limit: "50",
+    });
+    return data.list || [];
+}
+
+export async function createNote(data: Record<string, unknown>): Promise<CrmNote> {
+    const url = new URL("/api/crm", window.location.origin);
+    url.searchParams.set("path", "notes");
+    const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Create note: ${res.status}`);
+    return res.json();
+}
+
 export async function getContacts(params?: Record<string, string>): Promise<CrmContact[]> {
     const data = await crmFetch("contacts", {
         order_by: "last_name",
@@ -297,11 +337,11 @@ export async function getContacts(params?: Record<string, string>): Promise<CrmC
     return data.list || [];
 }
 
-export async function getThreads(include?: string): Promise<CrmThread[]> {
+export async function getThreads(include?: string, limit = 20): Promise<CrmThread[]> {
     const params: Record<string, string> = {
         order_by: "last_activity_at",
         order: "desc",
-        limit: "20",
+        limit: String(limit),
     };
     if (include) params.include = include;
     const data = await crmFetch("threads", params);
