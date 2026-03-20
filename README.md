@@ -2,6 +2,26 @@
 
 Hackathon project for Lette AI's PropTech challenge (2026-03-07). An agentic AI system that helps property managers process high-volume tenant, landlord, and contractor communications.
 
+## Demo
+
+<div>
+  <a href="https://www.loom.com/share/9943acded24142d4a77b64440f464457">
+    <p>Give(a)Lette - Part 1: Running a shift - Watch Video</p>
+  </a>
+  <a href="https://www.loom.com/share/9943acded24142d4a77b64440f464457">
+    <img style="max-width:300px;" src="https://cdn.loom.com/sessions/thumbnails/9943acded24142d4a77b64440f464457-7c09c766192a55e9-full-play.gif#t=0.1">
+  </a>
+</div>
+
+<div>
+  <a href="https://www.loom.com/share/a7f1ee550f384a27a8f95c30695b3431">
+    <p>Give(a)Lette - Part 2: UI and conversational AI overview - Watch Video</p>
+  </a>
+  <a href="https://www.loom.com/share/a7f1ee550f384a27a8f95c30695b3431">
+    <img style="max-width:300px;" src="https://cdn.loom.com/sessions/thumbnails/a7f1ee550f384a27a8f95c30695b3431-c2d845a5d665b2c5-full-play.gif#t=0.1">
+  </a>
+</div>
+
 ## What It Does
 
 - Triages incoming emails by urgency and sender type
