@@ -24,11 +24,11 @@ graph LR
         Chat[AI Chat Widget]
     end
 
-    subgraph Agent["Agent Container · port 8001"]
-        API[FastAPI API]
-        FrontendAI["Frontend AI\n(Sonnet, direct API)"]
-        Worker["Worker AI\n(Claude Code SDK)"]
-        CLI[crm CLI]
+    subgraph Clawling["clawling · port 8001"]
+        GW[Hono Gateway]
+        FrontendAI["Frontend Agent\n(Bedrock Messages API)"]
+        Worker["Worker Agent\n(Claude Agent SDK)"]
+        Deleg[Delegation System]
     end
 
     subgraph CRM["CRM API · port 8002"]
@@ -36,29 +36,31 @@ graph LR
         DB[(PostgreSQL)]
     end
 
-    Chat -->|SSE streaming| API
+    Chat -->|"SSE streaming\n/v1/chat/completions"| GW
     UI -->|/api/crm proxy| REST
-    API --> FrontendAI
-    API --> Worker
-    Worker -->|Bash| CLI
-    CLI -->|HTTP| REST
+    GW --> FrontendAI
+    GW -->|"/v1/wake/worker"| Worker
+    FrontendAI -->|delegate_to_worker| Deleg
+    Deleg --> Worker
+    Worker -->|"crm CLI (Bash)"| REST
     REST --> DB
 ```
 
-### Two-tier AI
+### Two-tier AI via clawling
 
-- **Frontend AI** (Claude Sonnet via Bedrock Messages API) — powers the chat widget. Responds in <5s by answering from page context or navigating the UI. No CRM calls needed for most interactions.
-- **Worker AI** (Claude Code SDK session) — handles batch shift processing and complex CRM queries that require tool use. Delegates from the Frontend AI only when needed (~30s response time).
+The AI layer is powered by [clawling](./clawling/), a lightweight TypeScript framework that orchestrates multiple Claude agents behind an OpenAI-compatible HTTP gateway.
 
-The Frontend AI has a comprehensive sitemap of all UI pages and prefers navigation over CRM delegation — asking "show me tasks for Graylings" navigates to the property page instantly rather than waiting for a worker query.
+- **Frontend Agent** (Bedrock Messages API, `messages-api` backend) — powers the chat widget. Responds in <5s by answering from page context or navigating the UI. Framework-defined tools (`page_action`, `delegate_to_worker`) execute within clawling, not the agent.
+- **Worker Agent** (Claude Agent SDK, `claude-sdk` backend) — handles batch shift processing and complex CRM queries. Has full Bash access to the `crm` CLI. Delegates from the Frontend Agent only when needed (~30s response time).
+
+The Frontend Agent has a comprehensive sitemap of all UI pages and prefers navigation over delegation — asking "show me tasks for Graylings" navigates to the property page instantly rather than spawning a worker query.
 
 ## Tech Stack
 
-- **Docker Compose** — orchestrates the full stack (PostgreSQL, CRM API, Agent, Frontend)
+- **Docker Compose** — orchestrates the full stack (PostgreSQL, CRM API, clawling, Frontend)
+- **[clawling](./clawling/)** — TypeScript agent orchestration framework (Hono + Zod + Claude SDKs)
 - **CRM API** — FastAPI + PostgreSQL with full-text search, 8 entities, generic CRUD
 - **CRM CLI** — `crm` command-line tool for agent ↔ CRM interaction (no MCP overhead)
-- **Claude Code SDK** — agentic AI layer for batch shift processing
-- **Anthropic Bedrock API** — direct Messages API for fast Frontend AI responses
 - **Next.js 16** — frontend with dashboard, inbox, tasks, contacts, properties, search, shifts
 - **Python + uv** — seed scripts, integration tests, utilities
 
@@ -129,16 +131,18 @@ Built for **BTR/PRS property management** in Ireland (Build-to-Rent / Private Re
 ## Project Structure
 
 ```
+clawling/               # Agent orchestration framework (TypeScript)
+  src/                  # Gateway, agent backends, delegation, sessions
+  config.json           # Agent definitions, routing, delegation settings
+  skills/frontend.md    # Frontend agent system prompt
+  Dockerfile            # Node 20 + Claude Code CLI
 crm/                    # CRM API service (FastAPI + PostgreSQL)
   main.py               # REST API with generic CRUD + full-text search
   models.py             # SQLAlchemy models (8 entities)
   database.py           # Async engine, sessions, lightweight migrations
-crm-cli/                # CRM CLI tool (installed in agent container)
+crm-cli/                # CRM CLI tool (installed in clawling container)
   crm_cli/main.py       # Click-based CLI: crm <entity> <action>
-agent/                  # Agent container (FastAPI + Claude Code SDK)
-  api.py                # HTTP API, Frontend AI system prompt, session management
-  frontend_ai.py        # Frontend AI — direct Bedrock Messages API client
-  mcp_worker.py         # Async worker dispatch for CRM queries
+agent/                  # Legacy agent (replaced by clawling)
   workspace/            # Agent skills (shift, triage) and CLAUDE.md
 frontend/               # Next.js 16 frontend (port 3000)
   src/app/              # Pages: dashboard, inbox, tasks, cases, contacts, properties, shifts, search

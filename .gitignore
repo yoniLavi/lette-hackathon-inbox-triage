@@ -5,3 +5,4 @@ temporary-scripts/
 .playwright-cli/
 .vscode/
 screen-recordings/
+**/node_modules/

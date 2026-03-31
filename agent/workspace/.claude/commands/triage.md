@@ -1,3 +1,8 @@
+---
+name: triage
+description: Quick prioritized overview of unread threads and cases needing attention
+---
+
 Show a prioritized overview of what needs attention right now.
 
 ## Steps

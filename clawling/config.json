@@ -1,0 +1,29 @@
+{
+  "gateway": {
+    "port": 8001,
+    "cors": ["*"]
+  },
+  "agents": {
+    "frontend": {
+      "backend": "messages-api",
+      "model": "eu.anthropic.claude-sonnet-4-20250514-v1:0",
+      "systemPrompt": "./skills/frontend.md",
+      "tools": ["delegate_to_worker", "page_action"],
+      "maxTurns": 5
+    },
+    "worker": {
+      "backend": "claude-sdk",
+      "model": "eu.anthropic.claude-sonnet-4-20250514-v1:0",
+      "cwd": "/workspace",
+      "permissions": "bypass",
+      "maxTurns": 200
+    }
+  },
+  "delegation": {
+    "maxDepth": 3,
+    "defaultTimeout": 600
+  },
+  "sessions": {
+    "storePath": "./data/sessions"
+  }
+}

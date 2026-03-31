@@ -30,16 +30,18 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  agent:
-    build: ./agent
+  clawling:
+    build: ./clawling
     environment:
       CLAUDE_CODE_USE_BEDROCK: ${CLAUDE_CODE_USE_BEDROCK}
       AWS_BEARER_TOKEN_BEDROCK: ${AWS_BEARER_TOKEN_BEDROCK}
       AWS_REGION: ${AWS_REGION}
       CRM_API_URL: http://crm-api:8002
-      UV_PROJECT_ENVIRONMENT: /tmp/agent-venv
+      CLAWLING_CONFIG: /app/config.json
     volumes:
-      - ./agent:/app
+      - ./clawling/src:/app/src
+      - ./clawling/config.json:/app/config.json
+      - ./clawling/skills:/app/skills
       - ./agent/workspace:/workspace
       - ./crm-cli:/opt/crm-cli
     ports:
@@ -62,7 +64,7 @@ services:
       - "3000:3000"
     depends_on:
       - crm-api
-      - agent
+      - clawling
     restart: unless-stopped
 
 volumes:

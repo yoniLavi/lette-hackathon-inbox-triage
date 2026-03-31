@@ -1,3 +1,8 @@
+---
+name: shift
+description: Process unread email threads in the CRM as a batch shift — fetch, triage, draft replies, create tasks, journal
+---
+
 Process unread email threads in the CRM as a batch shift.
 
 ## Setup

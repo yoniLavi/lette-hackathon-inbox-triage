@@ -1,3 +1,8 @@
+---
+name: compliance-check
+description: Scan upcoming and overdue task deadlines (28 days), categorize by regulatory type (fire, gas, RTB, HSE)
+---
+
 Scan for approaching regulatory and compliance deadlines across the portfolio.
 
 ## Steps

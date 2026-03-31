@@ -1,3 +1,8 @@
+---
+name: case-review
+description: Load case with threads, contacts, and tasks — produce status summary with timeline and next steps
+---
+
 Review a case with all its context and produce a status summary.
 
 Arguments: $ARGUMENTS (case ID or case name search term)

@@ -102,6 +102,7 @@ export function AIAssistant() {
     const [loading, setLoading] = useState(false);
     const [streamingText, setStreamingText] = useState("");
     const [workerTaskId, setWorkerTaskId] = useState<string | null>(null);
+    const clawlingSessionId = useRef<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const queuedMessage = useRef<string | null>(null);
     const loadingRef = useRef(false);
@@ -169,9 +170,9 @@ export function AIAssistant() {
         if (!workerTaskId) return;
         const interval = setInterval(async () => {
             try {
-                const res = await fetch(`${AGENT_URL}/worker/status`);
+                const res = await fetch(`${AGENT_URL}/v1/status/${workerTaskId}`);
                 const data = await res.json();
-                if (data.result) {
+                if (data.status === "completed" && data.result) {
                     setMessages(prev => [...prev, {
                         id: Date.now().toString(),
                         role: "assistant" as const,
@@ -230,18 +231,22 @@ export function AIAssistant() {
         setStatusText("Connecting...");
         setStreamingText("");
 
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (clawlingSessionId.current) {
+            headers["x-clawling-session-id"] = clawlingSessionId.current;
+        }
         const res = await fetch(url, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body,
         });
 
         console.log("[chat] fetch response status:", res.status);
 
         if (res.status === 409) {
-            console.log("[chat] Agent busy (409), restarting session and retrying...");
-            setStatusText("Agent busy, restarting...");
-            await fetch(`${AGENT_URL}/session/restart`, { method: "POST" });
+            console.log("[chat] Agent busy (409), retrying after brief wait...");
+            setStatusText("Agent busy, waiting...");
+            await new Promise(r => setTimeout(r, 1000));
             return processStream(url, body);
         }
 
@@ -251,8 +256,6 @@ export function AIAssistant() {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let currentEvent = "";
-        let finalResponse = "";
         let liveText = "";
         let returnedWorkerTaskId: string | undefined;
         let returnedAction: AIAction | undefined;
@@ -274,46 +277,62 @@ export function AIAssistant() {
             buffer = parts.pop() || "";
 
             for (const line of parts) {
-                if (line.startsWith("event: ")) {
-                    currentEvent = line.slice(7);
-                } else if (line.startsWith("data: ")) {
-                    try {
-                        const data = JSON.parse(line.slice(6));
-                        console.log("[chat] SSE event:", currentEvent, Object.keys(data));
-                        if (currentEvent === "status") {
-                            const label = data.status === "connecting" ? "Connecting..."
-                                : data.status === "querying_crm" ? "Searching CRM..."
-                                : "Typing...";
-                            setStatusText(label);
-                        } else if (currentEvent === "tool_use") {
-                            setStatusText(friendlyTool(data.tool));
-                        } else if (currentEvent === "progress") {
-                            setStatusText(data.text || "Working...");
-                        } else if (currentEvent === "action") {
-                            returnedAction = data as AIAction;
-                            console.log("[chat] action received:", data);
-                        } else if (currentEvent === "text") {
-                            liveText = data.text;
-                            setStreamingText(liveText);
-                            setStatusText("");
-                        } else if (currentEvent === "done") {
-                            finalResponse = data.response;
-                            if (data.worker_task_id) {
-                                returnedWorkerTaskId = data.worker_task_id;
-                            }
-                        } else if (currentEvent === "error") {
-                            throw new Error(data.detail);
-                        }
-                    } catch (e) {
-                        if (e instanceof SyntaxError) continue;
-                        throw e;
+                if (!line.startsWith("data: ")) continue;
+                const payload = line.slice(6);
+
+                // OpenAI-compatible [DONE] terminator
+                if (payload === "[DONE]") continue;
+
+                try {
+                    const data = JSON.parse(payload);
+                    const ext = data.clawling;
+
+                    // Standard OpenAI text delta
+                    const delta = data.choices?.[0]?.delta;
+                    if (delta?.content) {
+                        liveText += delta.content;
+                        setStreamingText(liveText);
+                        setStatusText("");
                     }
+
+                    // Finish reason
+                    const finishReason = data.choices?.[0]?.finish_reason;
+                    if (finishReason) {
+                        console.log("[chat] finish_reason:", finishReason);
+                    }
+
+                    // Clawling extension events
+                    if (ext) {
+                        console.log("[chat] clawling event:", ext.type || "meta", ext);
+                        if (ext.sessionId) {
+                            clawlingSessionId.current = ext.sessionId;
+                        }
+                        if (ext.type === "tool_call") {
+                            setStatusText(friendlyTool(ext.name));
+                        } else if (ext.type === "tool_call_update") {
+                            // tool completed, clear status
+                        } else if (ext.type === "progress") {
+                            setStatusText(ext.message || "Working...");
+                        } else if (ext.type === "delegation") {
+                            returnedWorkerTaskId = ext.taskId;
+                            setStatusText("Searching CRM...");
+                        } else if (ext.type === "action") {
+                            returnedAction = { action: ext.action, target: ext.target } as AIAction;
+                            console.log("[chat] action received:", ext);
+                        } else if (ext.type === "error") {
+                            throw new Error(ext.message);
+                        }
+                        // ext.sessionId — could track for session affinity
+                    }
+                } catch (e) {
+                    if (e instanceof SyntaxError) continue;
+                    throw e;
                 }
             }
         }
 
         return {
-            response: finalResponse || liveText || "(no response)",
+            response: liveText || "(no response)",
             workerTaskId: returnedWorkerTaskId,
             action: returnedAction,
         };
@@ -326,9 +345,8 @@ export function AIAssistant() {
         setStatusText("");
         setStreamingText("");
         setWorkerTaskId(null);
-        try {
-            await fetch(`${AGENT_URL}/session/restart`, { method: "POST" });
-        } catch { /* ignore */ }
+        // Clear clawling session to start fresh
+        clawlingSessionId.current = null;
     };
 
     const sendOne = async (text: string) => {
@@ -349,8 +367,13 @@ export function AIAssistant() {
 
         try {
             const context = serializePageContext(pageData);
-            const body = JSON.stringify({ message: text, context: context || undefined });
-            const { response, workerTaskId: wid, action } = await processStream(`${AGENT_URL}/prompt/stream`, body);
+            const userContent = context ? `[Page context: ${context}]\n\n${text}` : text;
+            const body = JSON.stringify({
+                model: "clawling/frontend",
+                stream: true,
+                messages: [{ role: "user", content: userContent }],
+            });
+            const { response, workerTaskId: wid, action } = await processStream(`${AGENT_URL}/v1/chat/completions`, body);
 
             if (action?.action === "navigate") {
                 // Navigate action: navigate to new page, wait for context, send follow-up
@@ -366,11 +389,13 @@ export function AIAssistant() {
                     console.log("[chat] new context after navigation (%d chars)", newContext.length);
 
                     // Send follow-up with new context for the AI to answer from
+                    const followupContent = `[Page context: ${newContext}]\n\n[Context update after navigation — answer the user's original question using this new page context. Use page_action scrollTo to highlight the most relevant element.]`;
                     const followupBody = JSON.stringify({
-                        message: "[Context update after navigation — answer the user's original question using this new page context. Use page_action scrollTo to highlight the most relevant element.]",
-                        context: newContext || undefined,
+                        model: "clawling/frontend",
+                        stream: true,
+                        messages: [{ role: "user", content: followupContent }],
                     });
-                    const followup = await processStream(`${AGENT_URL}/prompt/stream`, followupBody);
+                    const followup = await processStream(`${AGENT_URL}/v1/chat/completions`, followupBody);
 
                     const finalText = followup.response && followup.response !== "(no response)"
                         ? followup.response

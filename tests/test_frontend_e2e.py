@@ -25,7 +25,7 @@ AGENT_URL = "http://localhost:8001"
 CRM_URL = "http://localhost:8002"
 
 # Generous timeouts — worker delegation can take 30s+
-FAST_TIMEOUT = 15_000  # context-only responses
+FAST_TIMEOUT = 30_000  # context-only responses (clawling may do 2 API turns)
 SLOW_TIMEOUT = 120_000  # CRM delegation responses
 
 

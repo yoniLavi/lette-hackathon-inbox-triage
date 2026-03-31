@@ -374,7 +374,11 @@ export default function ShiftsPage() {
         setStarting(true);
         setError(null);
         try {
-            const resp = await fetch(`${AGENT_URL}/shift`, { method: "POST" });
+            const resp = await fetch(`${AGENT_URL}/v1/wake/worker`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: "/shift" }),
+            });
             if (resp.status === 409) {
                 setError("Agent is busy with another request.");
                 setStarting(false);
@@ -386,7 +390,17 @@ export default function ShiftsPage() {
                 return;
             }
             const data = await resp.json();
-            setActiveShiftId(data.shift_id);
+            // The wake endpoint returns taskId; the shift record is created by the worker.
+            // Poll CRM for the latest in-progress shift to get the shift_id.
+            // Poll CRM for the latest in-progress shift to get the shift_id
+            // (the worker creates the shift record as its first action)
+            let shiftId: number | null = null;
+            for (let i = 0; i < 10; i++) {
+                await new Promise(r => setTimeout(r, 1000));
+                const shifts = await getShifts({ status: "in_progress", limit: "1" });
+                if (shifts.length > 0) { shiftId = shifts[0].id; break; }
+            }
+            setActiveShiftId(shiftId);
             setWorkerStatus("busy");
             const newShift: CrmShift = {
                 id: data.shift_id,

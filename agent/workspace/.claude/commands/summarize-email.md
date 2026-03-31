@@ -1,3 +1,8 @@
+---
+name: summarize-email
+description: Load email/thread/case context and produce a full summary with timeline and recommended actions
+---
+
 Summarize a specific email or thread and its context.
 
 Arguments: $ARGUMENTS (email ID, thread ID, or subject search term)

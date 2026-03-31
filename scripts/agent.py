@@ -3,7 +3,7 @@
 # requires-python = ">=3.10"
 # dependencies = ["httpx>=0.27"]
 # ///
-"""Run a prompt against the CRM agent.
+"""Run a prompt against the CRM agent via clawling.
 
 Usage:
     uv run scripts/agent.py "List all emails in the CRM"
@@ -11,8 +11,7 @@ Usage:
     echo "Summarise urgent emails" | uv run scripts/agent.py
 
 Commands:
-    uv run scripts/agent.py --restart    Restart the agent session
-    uv run scripts/agent.py --status     Show session status
+    uv run scripts/agent.py --status     Show gateway health
     uv run scripts/agent.py --shift      Start a batch email processing shift
 """
 
@@ -24,29 +23,60 @@ AGENT_URL = "http://localhost:8001"
 
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] == "--restart":
-        resp = httpx.post(f"{AGENT_URL}/session/restart")
-        resp.raise_for_status()
-        print("Session restarted.")
-        return
-
     if len(sys.argv) > 1 and sys.argv[1] == "--shift":
         import time
         print("Starting shift (batch email processing)...")
         try:
-            resp = httpx.post(f"{AGENT_URL}/shift", timeout=30.0)
+            resp = httpx.post(
+                f"{AGENT_URL}/v1/wake/worker",
+                json={"prompt": "/shift"},
+                timeout=30.0,
+            )
         except httpx.ConnectError:
-            print("Error: cannot connect to agent API at", AGENT_URL, file=sys.stderr)
-            print("Is the agent running? Try: docker compose up -d", file=sys.stderr)
+            print("Error: cannot connect to clawling at", AGENT_URL, file=sys.stderr)
+            print("Is clawling running? Try: docker compose up -d", file=sys.stderr)
             sys.exit(1)
         if resp.status_code == 409:
             print("Error: agent is busy with another request", file=sys.stderr)
             sys.exit(1)
         resp.raise_for_status()
-        shift_id = resp.json()["shift_id"]
-        print(f"Shift {shift_id} started. Polling for completion...")
+        task_id = resp.json()["taskId"]
+        print(f"Task {task_id} started. Polling CRM for shift completion...")
 
         crm_url = "http://localhost:8002"
+        # Wait for shift record to appear, then poll for completion
+        shift_id = None
+        for _ in range(10):
+            time.sleep(2)
+            try:
+                shifts_resp = httpx.get(f"{crm_url}/api/shifts", params={"status": "in_progress", "limit": "1"}, timeout=10.0)
+                shifts = shifts_resp.json().get("list", [])
+                if shifts:
+                    shift_id = shifts[0]["id"]
+                    break
+            except Exception:
+                pass
+
+        if not shift_id:
+            print("Warning: could not find in-progress shift record, polling task status instead")
+            # Fall back to polling clawling task status
+            while True:
+                time.sleep(3)
+                try:
+                    status_resp = httpx.get(f"{AGENT_URL}/v1/status/{task_id}", timeout=10.0)
+                    data = status_resp.json()
+                    if data.get("status") in ("completed", "failed"):
+                        print(f"\nTask {data['status']}.")
+                        if data.get("result"):
+                            print(data["result"])
+                        break
+                    print(".", end="", flush=True)
+                except Exception as e:
+                    print(f"\nPolling error: {e}", file=sys.stderr)
+                    break
+            return
+
+        print(f"Shift {shift_id} in progress. Polling...")
         while True:
             time.sleep(3)
             try:
@@ -66,13 +96,9 @@ def main():
         return
 
     if len(sys.argv) > 1 and sys.argv[1] == "--status":
-        resp = httpx.get(f"{AGENT_URL}/session/status")
+        resp = httpx.get(f"{AGENT_URL}/health")
         resp.raise_for_status()
-        data = resp.json()
-        print(f"Active: {data['active']}")
-        print(f"Session ID: {data['session_id']}")
-        print(f"Messages: {data['message_count']}")
-        print(f"Busy: {data['busy']}")
+        print(resp.json())
         return
 
     if len(sys.argv) > 1:
@@ -89,13 +115,16 @@ def main():
 
     try:
         resp = httpx.post(
-            f"{AGENT_URL}/prompt",
-            json={"message": prompt},
+            f"{AGENT_URL}/v1/chat/completions",
+            json={
+                "model": "clawling/frontend",
+                "messages": [{"role": "user", "content": prompt}],
+            },
             timeout=300.0,
         )
     except httpx.ConnectError:
-        print("Error: cannot connect to agent API at", AGENT_URL, file=sys.stderr)
-        print("Is the agent running? Try: docker compose up -d", file=sys.stderr)
+        print("Error: cannot connect to clawling at", AGENT_URL, file=sys.stderr)
+        print("Is clawling running? Try: docker compose up -d", file=sys.stderr)
         sys.exit(1)
 
     if resp.status_code == 409:
@@ -104,7 +133,8 @@ def main():
 
     resp.raise_for_status()
     data = resp.json()
-    print(data["response"])
+    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    print(content)
 
 
 if __name__ == "__main__":
