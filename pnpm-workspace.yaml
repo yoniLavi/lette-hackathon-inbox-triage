@@ -1,0 +1,9 @@
+packages:
+  - "packages/*"
+  - "clawling"
+  - "frontend"
+
+onlyBuiltDependencies:
+  - "esbuild"
+  - "sharp"
+  - "unrs-resolver"

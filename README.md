@@ -32,7 +32,7 @@ graph LR
     end
 
     subgraph CRM["CRM API · port 8002"]
-        REST[FastAPI REST]
+        REST[Hono REST]
         DB[(PostgreSQL)]
     end
 
@@ -58,11 +58,13 @@ The Frontend Agent has a comprehensive sitemap of all UI pages and prefers navig
 ## Tech Stack
 
 - **Docker Compose** — orchestrates the full stack (PostgreSQL, CRM API, clawling, Frontend)
+- **pnpm monorepo** — unified package management for all TypeScript services
 - **[clawling](./clawling/)** — TypeScript agent orchestration framework (Hono + Zod + Claude SDKs)
-- **CRM API** — FastAPI + PostgreSQL with full-text search, 8 entities, generic CRUD
-- **CRM CLI** — `crm` command-line tool for agent ↔ CRM interaction (no MCP overhead)
+- **`@repo/crm-api`** — Hono REST API with Drizzle ORM + PostgreSQL, 8 entities, generic CRUD
+- **`@repo/crm-schema`** — Drizzle ORM schema with inferred types, shared across packages
+- **`@repo/crm-cli`** — TypeScript Commander CLI for agent ↔ CRM interaction
 - **Next.js 16** — frontend with dashboard, inbox, tasks, contacts, properties, search, shifts
-- **Python + uv** — seed scripts, integration tests, utilities
+- **vitest** — integration tests (CRM API, agent API) + Playwright E2E tests
 
 ## Frontend Pages
 
@@ -81,19 +83,22 @@ The Frontend Agent has a comprehensive sitemap of all UI pages and prefers navig
 
 ## Getting Started
 
-Prerequisites: Docker, [uv](https://docs.astral.sh/uv/)
+Prerequisites: Docker, Node.js 20+, pnpm 10+
 
 ```bash
-# 1. Start the stack
+# 1. Install dependencies
+pnpm install
+
+# 2. Start the stack
 docker compose up -d
 
-# 2. Wait for CRM API to be ready (~10s)
+# 3. Wait for CRM API to be ready (~10s)
 #    Check with: docker compose logs -f crm-api
 
-# 3. Seed test data (100 emails, contacts, 5 properties)
-uv run scripts/seed.py
+# 4. Seed test data (100 emails, contacts, 5 properties)
+pnpm seed
 
-# 4. Open the frontend at http://localhost:3000
+# 5. Open the frontend at http://localhost:3000
 #    CRM API is at http://localhost:8002
 ```
 
@@ -102,7 +107,7 @@ uv run scripts/seed.py
 Trigger an AI shift from the Shifts page in the UI, or via CLI:
 
 ```bash
-uv run scripts/agent.py --shift
+npx tsx scripts/agent.ts --shift
 ```
 
 The AI processes all unread email threads, creating cases, drafting replies, and assigning tasks. Progress is visible in real-time on the Shifts page.
@@ -111,14 +116,13 @@ The AI processes all unread email threads, creating cases, drafting replies, and
 
 ```bash
 # Send a prompt to the agent
-uv run scripts/agent.py "List all emails in the CRM"
+npx tsx scripts/agent.ts "List all emails in the CRM"
 
-# Check session status / restart
-uv run scripts/agent.py --status
-uv run scripts/agent.py --restart
+# Check session status
+npx tsx scripts/agent.ts --status
 
 # Reset + re-seed CRM data
-uv run scripts/reseed.py
+pnpm reseed
 
 # Run tests (stack must be running)
 ./scripts/test.sh
@@ -131,25 +135,31 @@ Built for **BTR/PRS property management** in Ireland (Build-to-Rent / Private Re
 ## Project Structure
 
 ```
+packages/
+  crm-schema/           # Drizzle ORM schema (@repo/crm-schema)
+    src/schema.ts       # pgTable definitions for all 8 entities
+    src/types.ts        # Select/Insert inferred types + Api* serialized types
+  crm-api/              # Hono REST API (@repo/crm-api, port 8002)
+    src/index.ts        # App assembly, CORS, migrations on startup
+    src/routes.ts       # Generic CRUD, filters, pagination, full-text search
+    src/threads.ts      # Thread auto-create/update, is_read computation
+    Dockerfile          # pnpm workspace-aware build
+  crm-cli/              # Commander CLI (@repo/crm-cli)
+    src/index.ts        # crm <entity> <action> commands
 clawling/               # Agent orchestration framework (TypeScript)
   src/                  # Gateway, agent backends, delegation, sessions
   config.json           # Agent definitions, routing, delegation settings
   skills/frontend.md    # Frontend agent system prompt
   Dockerfile            # Node 20 + Claude Code CLI
-crm/                    # CRM API service (FastAPI + PostgreSQL)
-  main.py               # REST API with generic CRUD + full-text search
-  models.py             # SQLAlchemy models (8 entities)
-  database.py           # Async engine, sessions, lightweight migrations
-crm-cli/                # CRM CLI tool (installed in clawling container)
-  crm_cli/main.py       # Click-based CLI: crm <entity> <action>
-agent/                  # Legacy agent (replaced by clawling)
-  workspace/            # Agent skills (shift, triage) and CLAUDE.md
+agent-workspace/        # Claude Code agent working directory
+  .claude/commands/     # Agent skills: /shift, /triage, /summarize-email, etc.
+  CLAUDE.md             # Worker agent instructions
 frontend/               # Next.js 16 frontend (port 3000)
   src/app/              # Pages: dashboard, inbox, tasks, cases, contacts, properties, shifts, search
   src/lib/crm.ts        # CRM data types, fetch functions, helpers
   src/lib/page-context.tsx  # Structured page context for AI chat
   src/components/       # SituationCard, DraftEditor, AIAssistant, QuickStats, UI primitives
-scripts/                # Python scripts (run with uv)
-tests/                  # Integration (CRM + agent API) + Playwright E2E tests
+scripts/                # TypeScript utilities (run via pnpm or npx tsx)
+tests/                  # vitest integration tests + Playwright E2E
 openspec/               # Spec-driven development (proposals, specs, tasks)
 ```

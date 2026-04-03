@@ -1,7 +1,15 @@
 /**
  * CRM data client.
  * Uses the Next.js /api/crm proxy route (works from both server and client).
+ *
+ * Types are derived from @repo/crm-schema but adapted for the API response
+ * format (dates as ISO strings, non-null defaults for always-present fields).
  */
+
+// Re-export the schema types for reference, but the Crm* types below
+// are the ones used throughout the frontend (with nullable overrides
+// matching what the API actually returns).
+export type { ApiProperty, ApiEmail, ApiCase } from "@repo/crm-schema";
 
 async function crmFetch(path: string, params?: Record<string, string>) {
     const url = new URL("/api/crm", window.location.origin);
@@ -40,7 +48,7 @@ export interface CrmContact {
     first_name: string;
     last_name: string;
     email: string;
-    type: string; // tenant, landlord, contractor, prospect, internal, legal
+    type: string;
     property_id?: number;
     company: string;
     unit: string;
@@ -132,7 +140,7 @@ export interface CrmShift {
     id: number;
     started_at: string;
     completed_at: string | null;
-    status: string; // in_progress / completed / failed
+    status: string;
     threads_processed: number;
     emails_processed: number;
     drafts_created: number;

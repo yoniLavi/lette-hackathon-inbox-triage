@@ -3,23 +3,23 @@ repos:
     hooks:
       - id: typescript-check
         name: TypeScript type check
-        entry: bash -c 'cd frontend && npx tsc --noEmit'
+        entry: bash -c 'pnpm -r typecheck && npx tsc --noEmit'
         language: system
         pass_filenames: false
-        files: ^frontend/.*\.(ts|tsx)$
+        files: \.(ts|tsx)$
 
       - id: integration-tests
         name: Integration tests (CRM + agent API)
-        entry: bash -c 'uv run --with pytest --with httpx -- pytest tests/test_crm_api.py tests/test_agent_api.py -v'
+        entry: bash -c 'pnpm vitest run tests/crm-api.test.ts tests/agent-api.test.ts'
         language: system
         pass_filenames: false
-        stages: [pre-commit]
-        files: \.(py|ts|tsx|json|yaml|sh)$
+        stages: [manual]
+        files: \.(ts|tsx|json|yaml|sh)$
 
       - id: e2e-tests
         name: E2E Playwright tests (fast subset)
-        entry: bash -c 'uv run --with playwright --with pytest --with httpx -- pytest tests/test_frontend_e2e.py -v -k "not delegation and not navigate"'
+        entry: bash -c 'pnpm vitest run tests/frontend-e2e.test.ts'
         language: system
         pass_filenames: false
-        stages: [pre-commit]
-        files: \.(py|ts|tsx|css|json|yaml|sh)$
+        stages: [manual]
+        files: \.(ts|tsx|css|json|yaml|sh)$

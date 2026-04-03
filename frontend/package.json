@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@repo/crm-schema": "workspace:*",
     "@tailwindcss/typography": "^0.5.19",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

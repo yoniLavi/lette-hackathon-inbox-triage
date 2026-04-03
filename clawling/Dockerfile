@@ -6,12 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     jq \
     ca-certificates \
-    python3 \
-    python3-venv \
     && rm -rf /var/lib/apt/lists/*
-
-# Install uv (for crm-cli)
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Install Claude Code globally (required by Claude Agent SDK)
 RUN npm install -g @anthropic-ai/claude-code@latest

@@ -152,7 +152,7 @@ The agent API SHALL expose an endpoint that triggers batch processing of active 
 - **THEN** the API returns `409 Conflict`
 
 #### Scenario: Shift via CLI
-- **WHEN** a user runs `scripts/agent.py --shift`
+- **WHEN** a user runs `npx tsx scripts/agent.ts --shift`
 - **THEN** the script calls `POST /shift`, receives the `shift_id`
 - **AND** polls `GET /api/shifts/{id}` on the CRM API until complete
 - **AND** prints the summary to stdout
@@ -199,7 +199,7 @@ The agent SHALL run two AI sessions: a Frontend AI (direct Anthropic/Bedrock API
 - **THEN** the Frontend AI responds directly within 3 seconds with no delegation
 
 ### Requirement: Direct API Frontend AI
-The Frontend AI SHALL call the Anthropic/Bedrock Messages API directly via the `anthropic` Python SDK, bypassing the Claude Code CLI subprocess. It SHALL maintain conversation history in-process and define delegation tools as native tool definitions.
+The Frontend AI SHALL call the Anthropic/Bedrock Messages API directly via the TypeScript `@anthropic-ai/bedrock-sdk`, bypassing the Claude Code CLI subprocess. It SHALL maintain conversation history in-process and define delegation tools as native tool definitions.
 
 #### Scenario: No CLI subprocess overhead
 - **WHEN** a user sends a message that can be answered from page context

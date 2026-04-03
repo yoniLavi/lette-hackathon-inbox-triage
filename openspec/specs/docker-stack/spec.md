@@ -1,44 +1,49 @@
 # docker-stack Specification
 
 ## Purpose
-TBD - created by archiving change setup-docker-stack. Update Purpose after archive.
+Docker Compose orchestration for the full stack: PostgreSQL, CRM API, clawling agent framework, and Next.js frontend.
+
 ## Requirements
+
 ### Requirement: Docker Compose Stack
 The project SHALL provide a `docker-compose.yml` that starts the full stack with a single `docker compose up -d` command.
 
 The stack SHALL include:
-- **MariaDB** — database backend for EspoCRM
-- **EspoCRM** — the CRM application, exposed on a configurable local port
-- **EspoCRM Daemon** — background job processor (cron, scheduled tasks, email fetching)
-- **Frontend** — Next.js dashboard, exposed on port 3000
+- **postgres** — PostgreSQL 16 database backend
+- **crm-api** — Hono REST API built from the pnpm monorepo (`packages/crm-api`)
+- **clawling** — TypeScript agent orchestration framework on port 8001
+- **frontend** — Next.js 16 dashboard on port 3000
 
 #### Scenario: Stack starts successfully
 - **WHEN** `docker compose up -d` is run from the project root
-- **THEN** all services (mariadb, espocrm, espocrm-daemon, frontend) start without errors
-- **AND** EspoCRM becomes accessible via HTTP within 60 seconds
+- **THEN** all services start without errors
+- **AND** the CRM API health endpoint (`GET /health`) returns `{"status":"ok"}` within 30 seconds
 - **AND** the frontend becomes accessible at http://localhost:3000
 
 #### Scenario: Data persists across restarts
-- **WHEN** the stack is stopped with `docker compose down` and restarted with `docker compose up -d`
-- **THEN** all CRM data (contacts, emails, cases) is preserved via named volumes
+- **WHEN** the stack is stopped with `docker compose down` and restarted
+- **THEN** all CRM data is preserved via the `postgres-data` named volume
 
-#### Scenario: Frontend connects to backend services
-- **WHEN** the frontend container starts
-- **THEN** it can reach EspoCRM at `http://espocrm` on the Docker network for server-side API calls
-- **AND** it can reach the agent API at `http://agent:8001` on the Docker network
+#### Scenario: Services communicate via Docker network
+- **WHEN** clawling needs to call the CRM API
+- **THEN** it resolves `http://crm-api:8002` on the Docker internal network
+- **AND** the frontend server-side proxy calls `http://crm-api:8002` for CRM data
 
-### Requirement: EspoCRM API Access
-EspoCRM SHALL be accessible via its REST API from the host machine for use by seed scripts and the MCP bridge.
+### Requirement: Development Bind Mounts
+Dev compose SHALL use bind mounts for hot-reloading without container rebuilds.
 
-#### Scenario: API responds to authenticated request
-- **WHEN** a GET request is made to `/api/v1/App/user` with valid admin credentials
-- **THEN** a 200 response with the admin user details is returned
+#### Scenario: clawling source hot-reload
+- **WHEN** TypeScript files under `clawling/src/` are edited
+- **THEN** the running container picks up changes via `tsx` without a rebuild
 
-### Requirement: Default Credentials Configuration
-The stack SHALL use environment variables (via `.env` file) for database and admin credentials, with sensible defaults for local development.
+#### Scenario: agent-workspace bind mount
+- **WHEN** agent skills in `agent-workspace/.claude/commands/` are edited
+- **THEN** the worker agent sees the updated skills immediately (no rebuild required)
 
-#### Scenario: Stack uses .env defaults
-- **WHEN** the `.env` file contains default credentials
-- **AND** `docker compose up -d` is run
-- **THEN** EspoCRM is configured with those credentials and admin login works
+### Requirement: CRM API Migrations on Startup
+The CRM API SHALL run Drizzle migrations automatically on startup before accepting requests.
 
+#### Scenario: Fresh database
+- **WHEN** the CRM API starts against an empty PostgreSQL database
+- **THEN** all 8 entity tables are created via Drizzle migrations
+- **AND** the API is ready to accept requests

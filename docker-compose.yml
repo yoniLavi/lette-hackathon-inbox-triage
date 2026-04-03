@@ -15,16 +15,18 @@ services:
     restart: unless-stopped
 
   crm-api:
-    build: ./crm
-    command: uv run uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+    build:
+      context: .
+      dockerfile: packages/crm-api/Dockerfile
+    command: pnpm --filter @repo/crm-api dev
     environment:
-      DATABASE_URL: postgresql+asyncpg://crm:crm@postgres:5432/crm
+      DATABASE_URL: postgresql://crm:crm@postgres:5432/crm
     ports:
       - "8002:8002"
     volumes:
-      - ./crm/main.py:/app/main.py
-      - ./crm/models.py:/app/models.py
-      - ./crm/database.py:/app/database.py
+      - ./packages/crm-schema/src:/app/packages/crm-schema/src
+      - ./packages/crm-schema/drizzle:/app/packages/crm-schema/drizzle
+      - ./packages/crm-api/src:/app/packages/crm-api/src
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,8 +44,8 @@ services:
       - ./clawling/src:/app/src
       - ./clawling/config.json:/app/config.json
       - ./clawling/skills:/app/skills
-      - ./agent/workspace:/workspace
-      - ./crm-cli:/opt/crm-cli
+      - ./agent-workspace:/workspace
+      - ./packages/crm-cli:/opt/crm-cli
     ports:
       - "8001:8001"
     depends_on:

@@ -5,11 +5,13 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 
 ## Tech Stack
 - Docker Compose (orchestration for the full stack)
+- **pnpm monorepo** — unified package management for all TypeScript services
 - **clawling** — TypeScript agent orchestration framework (Hono + Zod), OpenAI-compatible gateway on port 8001
-- CRM API — custom FastAPI + PostgreSQL with full-text search (port 8002)
-- CRM CLI — `crm` command-line tool for agent ↔ CRM interaction (no MCP overhead)
+- **`@repo/crm-api`** — Hono REST API with Drizzle ORM + PostgreSQL full-text search (port 8002)
+- **`@repo/crm-schema`** — Drizzle ORM schema with inferred types, shared across packages
+- **`@repo/crm-cli`** — TypeScript Commander CLI for agent ↔ CRM interaction (no MCP overhead)
 - Claude Agent SDK + Anthropic Bedrock Messages API (two-tier AI backends)
-- Python (seed scripts, utilities)
+- TypeScript — all services, scripts, and tests (vitest + Playwright for testing)
 - Next.js 16 frontend (port 3000)
 
 ## Project Conventions
@@ -20,8 +22,9 @@ Hackathon project (2026-03-07) for Lette AI's PropTech challenge. Build an agent
 - Keep dependencies minimal
 
 ### Scripts
-- All Python scripts in `scripts/` use a `uv` shebang (`#!/usr/bin/env -S uv run --script`) so they can be run directly: `scripts/agent.py "prompt"` (no `uv run` prefix needed)
-- Key scripts: `scripts/agent.py` (run agent prompts), `scripts/seed.py`, `scripts/reset.py`, `scripts/reseed.py`
+- All scripts in `scripts/` are TypeScript, run via pnpm aliases or `npx tsx`
+- Key scripts: `scripts/agent.ts` (run agent prompts), `scripts/seed.ts`, `scripts/reset.ts`, `scripts/reseed.ts`
+- Run via: `pnpm seed`, `pnpm reset`, `pnpm reseed`, `npx tsx scripts/agent.ts "prompt"`
 
 ### Architecture Patterns
 - **Two-tier AI via clawling**: Frontend agent (Bedrock Messages API, fast) + Worker agent (Claude Agent SDK, autonomous). Routing via `model` field in OpenAI-compatible requests.

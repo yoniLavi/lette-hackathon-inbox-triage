@@ -1,0 +1,29 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:crm": "pnpm --filter @repo/crm-api dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:clawling": "pnpm --filter clawling dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "seed": "npx tsx scripts/seed.ts",
+    "reset": "npx tsx scripts/reset.ts",
+    "reseed": "npx tsx scripts/reseed.ts",
+    "db:generate": "pnpm --filter @repo/crm-schema db:generate",
+    "db:migrate": "pnpm --filter @repo/crm-schema db:migrate"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "playwright": "^1.52.0",
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "vitest": "^3.2.1"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.11.0"
+}

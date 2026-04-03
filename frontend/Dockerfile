@@ -3,8 +3,8 @@ FROM node:22-alpine AS base
 # Install dependencies
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json package-lock.json* pnpm-lock.yaml* ./
+RUN npm ci 2>/dev/null || npx pnpm install --frozen-lockfile
 
 # Build the app
 FROM base AS builder

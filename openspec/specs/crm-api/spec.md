@@ -1,7 +1,7 @@
 # crm-api Specification
 
 ## Purpose
-FastAPI + PostgreSQL CRM service providing REST endpoints for managing PropTech entities (Properties, Contacts, Emails, Tasks, Cases, Notes, Threads) with full-text search, filtering, and composite data loading.
+Hono REST API with Drizzle ORM + PostgreSQL providing REST endpoints for managing PropTech entities (Properties, Contacts, Emails, Tasks, Cases, Notes, Threads, Shifts) with full-text search, filtering, and composite data loading.
 ## Requirements
 ### Requirement: CRM Entity CRUD
 The CRM API SHALL expose REST endpoints for managing Properties, Contacts, Emails, Tasks, Cases, Notes, and Threads with consistent JSON responses, filtering, ordering, and pagination.

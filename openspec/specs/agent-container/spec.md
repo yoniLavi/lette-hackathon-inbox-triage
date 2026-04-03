@@ -1,45 +1,46 @@
 # agent-container Specification
 
 ## Purpose
-TBD - created by archiving change add-agent-container. Update Purpose after archive.
-## Requirements
-### Requirement: Agent Container
-The agent container SHALL run a persistent FastAPI server instead of one-shot CLI invocations, while keeping the EspoMCP integration and Bedrock authentication.
+The clawling TypeScript agent framework runs as a Docker service, providing an OpenAI-compatible HTTP gateway that routes between a fast Frontend Agent (Bedrock Messages API) and an autonomous Worker Agent (Claude Agent SDK).
 
-#### Scenario: Persistent service
-- **WHEN** the agent container starts via `docker compose up`
-- **THEN** the FastAPI server starts and is accessible on port 8001
-- **AND** EspoMCP is available as an MCP tool via the Agent SDK
+## Requirements
+
+### Requirement: Agent Gateway
+The clawling container SHALL expose an OpenAI-compatible HTTP gateway on port 8001.
+
+#### Scenario: Gateway health check
+- **WHEN** `GET /health` is called
+- **THEN** the response is `{"status":"ok"}`
 
 #### Scenario: Ad-hoc prompt via CLI
-- **WHEN** a user runs `scripts/agent.py "List all emails"`
-- **THEN** the script sends the prompt to the HTTP API
+- **WHEN** a user runs `npx tsx scripts/agent.ts "List all open cases"`
+- **THEN** the script calls `POST /v1/chat/completions` with model `clawling/frontend`
 - **AND** returns the response to stdout
 
 ### Requirement: Bedrock Authentication
-The agent container SHALL authenticate with Claude via AWS Bedrock using a bearer token and configurable region.
+The clawling container SHALL authenticate with Claude via AWS Bedrock using a bearer token.
 
 #### Scenario: Bedrock credentials from environment
-- **WHEN** `CLAUDE_CODE_USE_BEDROCK=1`, `AWS_BEARER_TOKEN_BEDROCK`, and `AWS_REGION` are set in `.env`
-- **THEN** Claude Code uses Bedrock as the model provider
+- **WHEN** `CLAUDE_CODE_USE_BEDROCK=1`, `AWS_BEARER_TOKEN_BEDROCK`, and `AWS_REGION` are set
+- **THEN** both the Frontend Agent (Bedrock SDK) and Worker Agent (Claude Agent SDK) use Bedrock as the model provider
 
-### Requirement: Automatic API User Provisioning
-The system SHALL automatically create an EspoCRM API user for the agent, without manual UI steps.
+### Requirement: CRM CLI Access
+The Worker Agent SHALL have access to the `crm` CLI for all CRM operations.
 
-#### Scenario: First-time setup
-- **WHEN** `scripts/create_api_user.py` runs against a fresh EspoCRM instance
-- **THEN** an API user named "Agent" is created with full access
-- **AND** the API key is printed to stdout
+#### Scenario: CLI available in worker workspace
+- **WHEN** the worker agent runs a Bash command `crm cases list`
+- **THEN** the CLI calls the CRM API at `http://crm-api:8002` and returns JSON output
+- **AND** the agent workspace is mounted at `/workspace` with `CLAUDE.md` and `.claude/commands/`
 
-#### Scenario: Idempotent re-run
-- **WHEN** the script runs and the "Agent" API user already exists
-- **THEN** it prints the existing API key without creating a duplicate
+### Requirement: Two-Tier AI Architecture
+The gateway SHALL route requests to two distinct AI backends.
 
-### Requirement: MCP Configuration
-The agent container SHALL configure EspoMCP as a stdio MCP server, with the EspoCRM URL and API key injected via environment variables.
+#### Scenario: Frontend agent routing
+- **WHEN** `POST /v1/chat/completions` is called with model `clawling/frontend`
+- **THEN** the Frontend Agent (Bedrock Messages API, fast) handles the request
+- **AND** responds in under 5 seconds for context-only queries
 
-#### Scenario: MCP server startup
-- **WHEN** Claude Code starts with `--mcp-config /app/mcp.json`
-- **THEN** EspoMCP launches as a stdio child process
-- **AND** connects to EspoCRM using the configured URL and API key
-
+#### Scenario: Worker agent routing
+- **WHEN** `POST /v1/wake/worker` is called with a prompt
+- **THEN** the Worker Agent (Claude Agent SDK, autonomous) starts a background task
+- **AND** returns a `taskId` immediately for status polling

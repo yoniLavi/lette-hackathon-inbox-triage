@@ -1,56 +1,49 @@
 # seed-scripts Specification
 
 ## Purpose
-TBD - created by archiving change add-seed-reset-scripts. Update Purpose after archive.
+TypeScript scripts for seeding and resetting the CRM PostgreSQL database from the PropTech challenge dataset (`challenge-definition/proptech-test-data.json`).
+
 ## Requirements
+
 ### Requirement: CRM Reset
-The project SHALL provide a script that removes all seeded data (Emails, Contacts, Accounts, Cases, Tasks) from EspoCRM, returning it to a blank state for re-seeding or demo resets.
+The project SHALL provide a script that removes all seeded data from the CRM API, returning it to a blank state.
 
 #### Scenario: Reset clears all data
-- **WHEN** `python scripts/reset.py` is run against a populated EspoCRM instance
-- **THEN** all Emails, Contacts, Accounts, Cases, and Tasks are deleted
-- **AND** subsequent API queries for these entities return empty lists
+- **WHEN** `pnpm reset` (or `npx tsx scripts/reset.ts`) is run against a populated CRM
+- **THEN** all entities (Notes, Tasks, Shifts, Threads, Emails, Cases, Contacts, Properties) are deleted in dependency order
+- **AND** subsequent API queries return empty lists
 
 ### Requirement: Property Seeding
-The project SHALL provide a script that creates EspoCRM Accounts from the challenge dataset's property list, preserving property name, type, unit count, and manager assignment.
+The seed script SHALL create CRM Properties from the challenge dataset.
 
-#### Scenario: Properties seeded as Accounts
-- **WHEN** `python scripts/seed.py` is run against a clean EspoCRM instance
-- **THEN** 5 Accounts are created, one per property in `proptech-test-data.json`
-- **AND** each Account contains the property name, type (BTR/PRS), unit count, and manager name
+#### Scenario: Properties seeded
+- **WHEN** `pnpm seed` is run against a clean CRM
+- **THEN** 5 Properties are created from `proptech-test-data.json`
+- **AND** each Property has name, type (BTR/PRS), unit count, manager name, and a derived `manager_email`
 
 ### Requirement: Contact Seeding
-The project SHALL create EspoCRM Contacts for each unique email sender in the challenge dataset, linked to their property Account where a `property_id` is present.
+The seed script SHALL create Contacts for each unique email sender, linked to their Property where applicable.
 
 #### Scenario: Contacts created and linked
-- **WHEN** `python scripts/seed.py` is run
+- **WHEN** `pnpm seed` is run
 - **THEN** a Contact is created for each unique sender email address
-- **AND** Contacts with a `property_id` are linked to the corresponding Account
-- **AND** sender type and role information is preserved on the Contact
+- **AND** Contacts with a `property_id` are linked to the corresponding Property
+- **AND** sender type, role, company, and unit information is preserved
 
 ### Requirement: Email Seeding
-The project SHALL create EspoCRM Emails from the challenge dataset with correct sender, recipients, timestamps, body content, read status, and thread relationships.
+The seed script SHALL create Emails from the challenge dataset with threading, read status, and message relationships.
 
 #### Scenario: Emails seeded with threading
-- **WHEN** `python scripts/seed.py` is run
+- **WHEN** `pnpm seed` is run
 - **THEN** 100 Emails are created matching the challenge dataset
-- **AND** emails within the same `thread_id` are linked via reply relationships
-- **AND** `dateSent`, `isRead`, `from`, `to`, `cc`, and `subject` match the source data
+- **AND** `thread_id` and `thread_position` are set for threaded conversations
+- **AND** reply emails have `in_reply_to` set to the parent email's `message_id`
+- **AND** Thread records are auto-created by the CRM API via trigger logic
 
 ### Requirement: Reseed Convenience
-The project SHALL provide a single command that resets the CRM and re-seeds all data in one step.
+The project SHALL provide a single command to reset and re-seed in one step.
 
 #### Scenario: Full reseed cycle
-- **WHEN** `python scripts/reseed.py` is run
+- **WHEN** `pnpm reseed` is run
 - **THEN** existing data is cleared and fresh data is seeded from the challenge dataset
 - **AND** the final state matches a clean seed
-
-### Requirement: Case Seeding
-The seed script SHALL create a small number of example Cases that group existing seeded Emails, with linked Tasks and Notes, to populate the frontend dashboard before the agent runs.
-
-#### Scenario: Demo cases seeded
-- **WHEN** `python scripts/seed.py` is run after emails and contacts are seeded
-- **THEN** 1-2 Cases are created with names, priorities, and descriptions summarizing the linked emails
-- **AND** each Case is linked to relevant Emails and the corresponding Account
-- **AND** at least one Task is created per Case with a description and priority
-
