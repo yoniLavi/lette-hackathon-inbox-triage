@@ -9,8 +9,6 @@
 // Re-export the schema types for reference, but the Crm* types below
 // are the ones used throughout the frontend (with nullable overrides
 // matching what the API actually returns).
-export type { ApiProperty, ApiEmail, ApiCase } from "@repo/crm-schema";
-
 async function crmFetch(path: string, params?: Record<string, string>) {
     const url = new URL("/api/crm", window.location.origin);
     url.searchParams.set("path", path);

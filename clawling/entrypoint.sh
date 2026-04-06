@@ -10,10 +10,10 @@ if [ -d /opt/crm-cli ]; then
 exec npx tsx /opt/crm-cli/src/index.ts "$@"
 WRAPPER
   chmod +x /usr/local/bin/crm
-  # Install crm-cli dependencies if needed
+  # Install crm-cli dependencies if needed (crm-cli is a standalone HTTP client
+  # with no workspace deps, so plain npm install is sufficient).
   if [ -f /opt/crm-cli/package.json ] && [ ! -d /opt/crm-cli/node_modules ]; then
-    cd /opt/crm-cli && npm install --production 2>/dev/null || true
-    cd /app
+    (cd /opt/crm-cli && npm install --omit=dev --no-audit --no-fund)
   fi
 fi
 

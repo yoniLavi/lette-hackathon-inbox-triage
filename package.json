@@ -9,6 +9,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
+    "knip": "knip",
     "seed": "npx tsx scripts/seed.ts",
     "reset": "npx tsx scripts/reset.ts",
     "reseed": "npx tsx scripts/reseed.ts",
@@ -17,9 +18,10 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "knip": "^6.3.0",
     "playwright": "^1.52.0",
-    "typescript": "^5.7.0",
     "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
     "vitest": "^3.2.1"
   },
   "engines": {

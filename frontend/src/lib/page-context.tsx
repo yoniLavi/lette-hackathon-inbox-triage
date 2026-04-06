@@ -153,7 +153,7 @@ interface GenericContext {
     page: string;
 }
 
-export type PageData = DashboardContext | SituationContext | PropertiesContext | SearchContext | InboxContext | TasksContext | ContactsContext | PropertyDetailContext | ContactDetailContext | GenericContext;
+type PageData = DashboardContext | SituationContext | PropertiesContext | SearchContext | InboxContext | TasksContext | ContactsContext | PropertyDetailContext | ContactDetailContext | GenericContext;
 
 // ---------- Context ----------
 

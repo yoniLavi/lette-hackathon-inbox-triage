@@ -24,12 +24,6 @@ const AgentConfigSchema = z.object({
   tools: z.array(z.string()).optional(),
 });
 
-const CustomToolSchema = z.object({
-  command: z.string(),
-  description: z.string(),
-  parameters: z.record(z.string(), z.unknown()).optional(),
-});
-
 const GatewaySchema = z.object({
   port: z.number().int().positive().default(8001),
   cors: z.array(z.string()).default(["*"]),
@@ -40,21 +34,14 @@ const DelegationSchema = z.object({
   defaultTimeout: z.number().positive().default(300),
 });
 
-const SessionsSchema = z.object({
-  storePath: z.string().default("./data/sessions"),
-});
-
 export const ConfigSchema = z.object({
   gateway: GatewaySchema.default(() => ({ port: 8001, cors: ["*"] })),
   agents: z.record(z.string(), AgentConfigSchema),
   delegation: DelegationSchema.default(() => ({ maxDepth: 3, defaultTimeout: 300 })),
-  tools: z.record(z.string(), CustomToolSchema).optional(),
-  sessions: SessionsSchema.default(() => ({ storePath: "./data/sessions" })),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
-export type CustomToolConfig = z.infer<typeof CustomToolSchema>;
 
 // ---------------------------------------------------------------------------
 // Loader

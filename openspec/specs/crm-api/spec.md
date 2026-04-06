@@ -4,7 +4,7 @@
 Hono REST API with Drizzle ORM + PostgreSQL providing REST endpoints for managing PropTech entities (Properties, Contacts, Emails, Tasks, Cases, Notes, Threads, Shifts) with full-text search, filtering, and composite data loading.
 ## Requirements
 ### Requirement: CRM Entity CRUD
-The CRM API SHALL expose REST endpoints for managing Properties, Contacts, Emails, Tasks, Cases, Notes, and Threads with consistent JSON responses, filtering, ordering, and pagination.
+The CRM API SHALL expose REST endpoints for managing Properties, Contacts, Emails, Tasks, Cases, Notes, Threads, and Shifts with consistent JSON responses, filtering, ordering, and pagination. The API SHALL be implemented in TypeScript using Hono and Drizzle ORM, with entity types inferred from a shared Drizzle schema (`@repo/crm-schema`).
 
 #### Scenario: List entities with filters
 - **WHEN** a client sends `GET /api/emails?status=archived&is_read=false&limit=10&order_by=date_sent&order=asc`
@@ -33,6 +33,11 @@ The CRM API SHALL expose REST endpoints for managing Properties, Contacts, Email
 #### Scenario: Dashboard counts
 - **WHEN** a client sends `GET /api/counts`
 - **THEN** the API returns `{"emails": N, "open_tasks": N, "closed_cases": N}`
+
+#### Scenario: Shared schema types
+- **WHEN** the CRM API starts
+- **THEN** entity table definitions and TypeScript types are imported from `@repo/crm-schema`
+- **AND** no type definitions are duplicated between the API, CLI, or frontend
 
 ### Requirement: Thread Entity
 The CRM API SHALL maintain Threads as a first-class entity, automatically derived from email `thread_id` values. A Thread aggregates related emails into a conversation view.
@@ -134,4 +139,21 @@ The CRM API SHALL maintain Shifts as a first-class entity tracking each batch pr
 #### Scenario: Get shift with journal case
 - **WHEN** a client sends `GET /api/shifts/{id}?include=case`
 - **THEN** the response includes the Shift record plus a nested `case` object with its notes (the per-thread journal entries)
+
+### Requirement: Shared CRM Schema Package
+The project SHALL maintain a `@repo/crm-schema` package containing Drizzle ORM table definitions for all CRM entities. This package SHALL be the single source of truth for database schema and TypeScript types, imported by the CRM API, CRM CLI, frontend, and scripts.
+
+#### Scenario: Schema defines all entities
+- **WHEN** the `@repo/crm-schema` package is imported
+- **THEN** it exports Drizzle `pgTable` definitions for: properties, contacts, emails, tasks, cases, notes, threads, shifts
+- **AND** it exports inferred `Select` and `Insert` TypeScript types for each entity
+
+#### Scenario: Frontend imports types directly
+- **WHEN** the frontend needs CRM entity types
+- **THEN** it imports them from `@repo/crm-schema` (e.g., `import type { Email } from "@repo/crm-schema"`)
+- **AND** no manual type interface definitions are maintained in the frontend
+
+#### Scenario: Schema matches PostgreSQL
+- **WHEN** the Drizzle schema is compared to the running PostgreSQL database
+- **THEN** all table names, column names, column types, foreign keys, and defaults match exactly
 

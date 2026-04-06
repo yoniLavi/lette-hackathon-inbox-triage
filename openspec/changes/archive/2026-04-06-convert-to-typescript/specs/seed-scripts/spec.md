@@ -38,6 +38,8 @@ The project SHALL provide a single command that resets the CRM and re-seeds all 
 - **WHEN** `npx tsx scripts/reseed.ts` is run
 - **THEN** existing data is cleared and fresh data is seeded
 
+## ADDED Requirements
+
 ### Requirement: Case Seeding
 The seed script SHALL create example Cases that group existing seeded Emails, with linked Tasks and Notes, to populate the frontend dashboard before the agent runs.
 

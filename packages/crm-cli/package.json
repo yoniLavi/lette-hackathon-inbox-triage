@@ -9,12 +9,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@repo/crm-schema": "workspace:*",
-    "commander": "^13.1.0"
+    "commander": "^13.1.0",
+    "tsx": "^4.19.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }
 }

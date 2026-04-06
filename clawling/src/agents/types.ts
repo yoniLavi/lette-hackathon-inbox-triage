@@ -64,15 +64,3 @@ export interface AgentBackend {
   createSession(config: SessionConfig): Promise<AgentSession>;
   resumeSession(sessionId: string): Promise<AgentSession>;
 }
-
-// ---------------------------------------------------------------------------
-// Session info — for listing/introspection
-// ---------------------------------------------------------------------------
-
-export interface SessionInfo {
-  sessionId: string;
-  agentName: string;
-  createdAt: string;
-  lastActivityAt: string;
-  messageCount: number;
-}

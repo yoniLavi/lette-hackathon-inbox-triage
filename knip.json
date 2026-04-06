@@ -1,0 +1,32 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "rules": {
+    "files": "error",
+    "dependencies": "error",
+    "devDependencies": "error",
+    "unlisted": "error",
+    "unresolved": "error",
+    "binaries": "error",
+    "exports": "warn",
+    "types": "warn",
+    "nsExports": "warn",
+    "nsTypes": "warn",
+    "enumMembers": "warn",
+    "duplicates": "warn"
+  },
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.ts", "tests/*.test.ts"],
+      "project": ["scripts/**/*.ts", "tests/**/*.ts"]
+    },
+    "packages/crm-schema": {},
+    "packages/crm-api": {},
+    "packages/crm-cli": {
+      "ignoreDependencies": ["tsx"]
+    },
+    "clawling": {},
+    "frontend": {
+      "ignoreDependencies": ["postcss"]
+    }
+  }
+}

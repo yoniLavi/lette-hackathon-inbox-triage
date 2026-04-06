@@ -8,6 +8,13 @@ repos:
         pass_filenames: false
         files: \.(ts|tsx)$
 
+      - id: knip
+        name: knip (unused files / deps / exports)
+        entry: bash -c 'pnpm -s knip'
+        language: system
+        pass_filenames: false
+        files: \.(ts|tsx|mjs|cjs|js|jsx|json)$
+
       - id: integration-tests
         name: Integration tests (CRM + agent API)
         entry: bash -c 'pnpm vitest run tests/crm-api.test.ts tests/agent-api.test.ts'

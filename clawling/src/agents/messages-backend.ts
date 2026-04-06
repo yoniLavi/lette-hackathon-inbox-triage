@@ -96,7 +96,7 @@ interface MessagesResponse {
 }
 
 // Delegate handler type — injected by the gateway/spawner
-export type DelegateHandler = (prompt: string) => Promise<string>;
+type DelegateHandler = (prompt: string) => Promise<string>;
 
 export class MessagesAPIBackend implements AgentBackend {
   readonly backendType = "messages-api";
@@ -104,7 +104,7 @@ export class MessagesAPIBackend implements AgentBackend {
   constructor(
     private name: string,
     private agentConfig: AgentConfig,
-    private globalConfig: Config
+    _globalConfig: Config
   ) {}
 
   async createSession(config: SessionConfig): Promise<AgentSession> {

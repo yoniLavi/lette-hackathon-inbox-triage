@@ -7,7 +7,7 @@
 import type { Config } from "../config.js";
 import { log } from "../log.js";
 
-export interface DelegationRecord {
+interface DelegationRecord {
   taskId: string;
   parentSessionId: string;
   childSessionId: string;
@@ -25,7 +25,7 @@ export class DelegationTracker {
   private records = new Map<string, DelegationRecord>();
 
   constructor(
-    private delegationConfig: Config["delegation"]
+    _delegationConfig: Config["delegation"]
   ) {}
 
   register(record: DelegationRecord): void {
