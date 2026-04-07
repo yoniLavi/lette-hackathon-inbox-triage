@@ -44,6 +44,7 @@ services:
       - ./clawling/src:/app/src
       - ./clawling/config.json:/app/config.json
       - ./clawling/skills:/app/skills
+      - ./clawling/entrypoint.sh:/app/entrypoint.sh
       - ./agent-workspace:/workspace
       - ./packages/crm-cli:/opt/crm-cli
     ports:

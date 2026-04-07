@@ -65,6 +65,17 @@ export class DelegationTracker {
     );
   }
 
+  /** Find the most recent running task for a given agent. */
+  getRunningByAgent(agentName: string): DelegationRecord | undefined {
+    let latest: DelegationRecord | undefined;
+    for (const r of this.records.values()) {
+      if (r.childAgentName === agentName && r.status === "running") {
+        if (!latest || r.startedAt > latest.startedAt) latest = r;
+      }
+    }
+    return latest;
+  }
+
   /** Consume a completed/failed result — returns it once, then clears. */
   consumeResult(taskId: string): DelegationRecord | undefined {
     const record = this.records.get(taskId);

@@ -141,11 +141,11 @@ function ShiftCard({ shift, defaultExpanded }: { shift: CrmShift; defaultExpande
                     {isRunning ? (
                         <div className="mt-1.5">
                             <p className="text-xs text-blue-600/70 font-sans italic animate-pulse">
-                                {shift.summary || "Starting shift..."}
+                                {shift.summary || ((shift.notes?.length ?? 0) > 0 ? "Processing emails..." : "Starting shift...")}
                             </p>
-                            {shift.threads_processed > 0 && (
+                            {(shift.notes?.length ?? 0) > 0 && (
                                 <div className="flex gap-3 mt-1 text-[11px] text-[#0F1016]/40 font-sans">
-                                    <span>{shift.threads_processed} thread{shift.threads_processed !== 1 ? "s" : ""} processed</span>
+                                    <span>{shift.notes!.length} thread{shift.notes!.length !== 1 ? "s" : ""} processed</span>
                                 </div>
                             )}
                         </div>
@@ -270,6 +270,9 @@ export default function ShiftsPage() {
     const [backlogThreads, setBacklogThreads] = useState<CrmThread[]>([]);
     const [backlogTotal, setBacklogTotal] = useState(0);
     const [activeShiftId, setActiveShiftId] = useState<number | null>(null);
+    const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+
+    const [loaded, setLoaded] = useState(false);
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [workerStatus, setWorkerStatus] = useState<WorkerStatus>("online");
@@ -288,6 +291,9 @@ export default function ShiftsPage() {
         // Sync active shift state with CRM
         const running = shiftsData.find((s: CrmShift) => s.status === "in_progress");
         setActiveShiftId(running ? running.id : null);
+        // Clear stale taskId if no shift is running
+        if (!running) setActiveTaskId(null);
+        setLoaded(true);
     }, []);
 
     // Check worker health — cross-references agent status with CRM shift state
@@ -298,19 +304,18 @@ export default function ShiftsPage() {
                 setWorkerStatus("error");
                 return;
             }
-            const data = await resp.json();
-            if (data.shift_active) {
+            const data = await resp.json() as { busy: boolean; taskId: string | null };
+            if (data.busy) {
                 setWorkerStatus("busy");
-            } else if (data.busy) {
-                setWorkerStatus("busy");
+                if (data.taskId) setActiveTaskId(data.taskId);
+                return;
+            }
+            // Agent says idle — check for stuck CRM shifts
+            const hasStuckShift = shifts.some(s => s.status === "in_progress");
+            if (hasStuckShift) {
+                setWorkerStatus("unresponsive");
             } else {
-                // Agent says idle — but does the CRM still have an in_progress shift?
-                const hasStuckShift = shifts.some(s => s.status === "in_progress");
-                if (hasStuckShift) {
-                    setWorkerStatus("unresponsive");
-                } else {
-                    setWorkerStatus("online");
-                }
+                setWorkerStatus("online");
             }
         } catch {
             setWorkerStatus("offline");
@@ -335,17 +340,40 @@ export default function ShiftsPage() {
         }
 
         pollRef.current = setInterval(async () => {
+            // Check task status — worker may finish without updating CRM shift record
+            if (activeTaskId) {
+                try {
+                    const taskResp = await fetch(`${AGENT_URL}/v1/status/${activeTaskId}`);
+                    const task = await taskResp.json() as { status: string; result?: string };
+                    if (task.status === "failed") {
+                        setError(`Shift failed: ${task.result || "unknown error"}`);
+                        setActiveShiftId(null);
+                        setActiveTaskId(null);
+                        await loadData();
+                        await checkWorkerHealth();
+                        return;
+                    }
+                    if (task.status === "completed") {
+                        setActiveShiftId(null);
+                        setActiveTaskId(null);
+                        await loadData();
+                        await checkWorkerHealth();
+                        return;
+                    }
+                } catch { /* task status unavailable, continue to CRM poll */ }
+            }
             try {
-                const shift = await getShift(activeShiftId);
+                const shift = await getShift(activeShiftId, "notes");
                 if (shift.status !== "in_progress") {
                     setActiveShiftId(null);
+                    setActiveTaskId(null);
                     await loadData();
                     await checkWorkerHealth();
                 } else {
                     setShifts(prev => prev.map(s => s.id === activeShiftId ? shift : s));
                 }
             } catch {
-                // ignore polling errors
+                // CRM polling error — don't clear shift state, just skip this tick
             }
         }, 3000);
 
@@ -355,7 +383,7 @@ export default function ShiftsPage() {
                 pollRef.current = null;
             }
         };
-    }, [activeShiftId, loadData, checkWorkerHealth]);
+    }, [activeShiftId, activeTaskId, loadData, checkWorkerHealth]);
 
     const restartWorker = async () => {
         setError(null);
@@ -389,36 +417,37 @@ export default function ShiftsPage() {
                 setStarting(false);
                 return;
             }
-            const data = await resp.json();
-            // The wake endpoint returns taskId; the shift record is created by the worker.
-            // Poll CRM for the latest in-progress shift to get the shift_id.
-            // Poll CRM for the latest in-progress shift to get the shift_id
-            // (the worker creates the shift record as its first action)
-            let shiftId: number | null = null;
-            for (let i = 0; i < 10; i++) {
-                await new Promise(r => setTimeout(r, 1000));
-                const shifts = await getShifts({ status: "in_progress", limit: "1" });
-                if (shifts.length > 0) { shiftId = shifts[0].id; break; }
+            const data = await resp.json() as { taskId: string; shiftId?: number };
+            // The wake endpoint creates the shift record and returns both taskId and shiftId.
+            let shiftId: number | null = data.shiftId ?? null;
+            if (!shiftId) {
+                // Fallback: poll CRM for shift record with task failure detection
+                for (let i = 0; i < 15; i++) {
+                    await new Promise(r => setTimeout(r, 2000));
+                    try {
+                        const taskResp = await fetch(`${AGENT_URL}/v1/status/${data.taskId}`);
+                        const task = await taskResp.json() as { status: string; result?: string };
+                        if (task.status === "failed") {
+                            setError(`Shift failed: ${task.result || "unknown error"}`);
+                            setStarting(false);
+                            return;
+                        }
+                    } catch { /* task status unavailable, continue */ }
+                    try {
+                        const shifts = await getShifts({ status: "in_progress", limit: "1" });
+                        if (shifts.length > 0) { shiftId = shifts[0].id; break; }
+                    } catch { /* CRM unavailable, retry */ }
+                }
+            }
+            if (!shiftId) {
+                setError("Shift failed to start — no shift record was created. Check clawling logs.");
+                setStarting(false);
+                return;
             }
             setActiveShiftId(shiftId);
+            setActiveTaskId(data.taskId);
             setWorkerStatus("busy");
-            const newShift: CrmShift = {
-                id: data.shift_id,
-                started_at: new Date().toISOString(),
-                completed_at: null,
-                status: "in_progress",
-                threads_processed: 0,
-                emails_processed: 0,
-                drafts_created: 0,
-                tasks_created: 0,
-                summary: null,
-                cost_usd: null,
-                current_thread_id: null,
-                case_id: null,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            };
-            setShifts(prev => [newShift, ...prev]);
+            await loadData();
         } catch (e) {
             setError(`Failed to start shift: ${e}`);
         } finally {
@@ -505,8 +534,8 @@ export default function ShiftsPage() {
                             ))}
                             {shifts.length === 0 && (
                                 <Card className="bg-[#F2F2EC] border-transparent p-8 text-center">
-                                    <p className="text-sm text-[#0F1016]/50 font-sans">
-                                        No shifts yet. Click &quot;Start Shift&quot; to run your first AI triage session.
+                                    <p className="text-sm text-[#0F1016]/50 font-sans italic">
+                                        {loaded ? "No shifts yet. Start a shift to run your first AI triage session." : "Loading..."}
                                     </p>
                                 </Card>
                             )}

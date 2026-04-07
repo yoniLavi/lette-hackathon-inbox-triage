@@ -40,66 +40,102 @@ async function runShift(): Promise<void> {
     console.error("Error: agent is busy with another request");
     process.exit(1);
   }
-  if (!resp.ok) throw new Error(`Wake failed: ${resp.status}`);
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Wake failed (${resp.status}): ${body}`);
+  }
 
-  const { taskId } = (await resp.json()) as { taskId: string };
-  console.log(`Task ${taskId} started. Polling CRM for shift completion...`);
+  const wakeData = (await resp.json()) as { taskId: string; shiftId?: number };
+  const { taskId } = wakeData;
+  let shiftId: number | null = wakeData.shiftId ?? null;
+  console.log(`Task ${taskId} started.${shiftId ? ` Shift ${shiftId} created.` : ""} Waiting...`);
 
-  // Wait for shift record to appear
-  let shiftId: number | null = null;
-  for (let i = 0; i < 10; i++) {
-    await sleep(2000);
-    try {
-      const r = await fetch(
-        `${CRM_URL}/api/shifts?status=in_progress&limit=1`,
-        { signal: AbortSignal.timeout(10_000) },
-      );
-      const data = (await r.json()) as { list: { id: number }[] };
-      if (data.list?.length) {
-        shiftId = data.list[0].id;
-        break;
+  // If the wake endpoint didn't return a shiftId, poll for it
+  if (!shiftId) {
+    for (let i = 0; i < 15; i++) {
+      await sleep(2000);
+
+      // Check task status first — surface failures immediately
+      try {
+        const tr = await fetch(`${AGENT_URL}/v1/status/${taskId}`, {
+          signal: AbortSignal.timeout(5_000),
+        });
+        const task = (await tr.json()) as { status: string; result?: string };
+        if (task.status === "failed") {
+          console.error(`\nShift failed: ${task.result || "(no details)"}`);
+          process.exit(1);
+        }
+        if (task.status === "completed") {
+          console.log(`\nTask completed.`);
+          if (task.result) console.log(task.result);
+          return;
+        }
+      } catch {
+        // task status endpoint unavailable, continue to CRM poll
       }
-    } catch {
-      // retry
+
+      // Check CRM for in-progress shift
+      try {
+        const r = await fetch(
+          `${CRM_URL}/api/shifts?status=in_progress&limit=1`,
+          { signal: AbortSignal.timeout(5_000) },
+        );
+        const data = (await r.json()) as { list: { id: number }[] };
+        if (data.list?.length) {
+          shiftId = data.list[0].id;
+          break;
+        }
+      } catch {
+        // CRM unavailable, retry
+      }
+      process.stdout.write(".");
     }
   }
 
   if (!shiftId) {
-    console.log("Warning: could not find in-progress shift record, polling task status instead");
-    while (true) {
-      await sleep(3000);
-      try {
-        const r = await fetch(`${AGENT_URL}/v1/status/${taskId}`, {
-          signal: AbortSignal.timeout(10_000),
-        });
-        const data = (await r.json()) as { status: string; result?: string };
-        if (data.status === "completed" || data.status === "failed") {
-          console.log(`\nTask ${data.status}.`);
-          if (data.result) console.log(data.result);
-          break;
-        }
-        process.stdout.write(".");
-      } catch (e) {
-        console.error(`\nPolling error: ${e}`);
-        break;
-      }
-    }
-    return;
+    console.error("\nError: shift never started — no in-progress shift record found and task did not complete.");
+    console.error("Check clawling logs: docker compose logs clawling --tail 50");
+    process.exit(1);
   }
 
-  console.log(`Shift ${shiftId} in progress. Polling...`);
+  console.log(`\nShift ${shiftId} in progress. Polling...`);
   while (true) {
     await sleep(3000);
+    // Check task status — the worker may finish without updating the CRM shift record
+    try {
+      const tr = await fetch(`${AGENT_URL}/v1/status/${taskId}`, {
+        signal: AbortSignal.timeout(5_000),
+      });
+      const task = (await tr.json()) as { status: string; result?: string };
+      if (task.status === "failed") {
+        console.error(`\nShift failed: ${task.result || "(no details)"}`);
+        process.exit(1);
+      }
+      if (task.status === "completed") {
+        console.log(`\nShift completed.`);
+        if (task.result) console.log(task.result);
+        break;
+      }
+    } catch {
+      // task status unavailable, fall through to CRM poll
+    }
+
+    // Also check CRM shift record (worker may have updated it directly)
     try {
       const r = await fetch(`${CRM_URL}/api/shifts/${shiftId}`, {
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(5_000),
       });
-      if (!r.ok) throw new Error(`${r.status}`);
+      if (!r.ok) throw new Error(`CRM returned ${r.status}`);
       const data = (await r.json()) as { status: string; summary?: string };
-      if (data.status === "completed" || data.status === "failed") {
-        console.log(`\nShift ${data.status}.`);
+      if (data.status === "completed") {
+        console.log(`\nShift completed.`);
         if (data.summary) console.log(data.summary);
         break;
+      }
+      if (data.status === "failed") {
+        console.error(`\nShift failed.`);
+        if (data.summary) console.error(data.summary);
+        process.exit(1);
       }
       process.stdout.write(".");
     } catch (e) {

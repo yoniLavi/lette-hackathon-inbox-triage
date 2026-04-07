@@ -7,6 +7,8 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import type { AgentConfig, Config } from "../config.js";
 import type {
   AgentBackend,
@@ -88,12 +90,28 @@ class ClaudeSDKSession implements AgentSession {
       options.resume = this.sessionId;
     }
 
+    // Resolve /command prompts to skill file content — the Agent SDK's query()
+    // doesn't load custom .claude/commands/ files, so we expand them here.
+    let resolvedPrompt = message;
+    if (message.startsWith("/") && this.agentConfig.cwd) {
+      const skillName = message.slice(1).split(/\s/)[0];
+      const skillPath = join(this.agentConfig.cwd, ".claude", "commands", `${skillName}.md`);
+      if (existsSync(skillPath)) {
+        const skillContent = readFileSync(skillPath, "utf-8");
+        const args = message.slice(1 + skillName.length).trim();
+        resolvedPrompt = args ? `${skillContent}\n\n${args}` : skillContent;
+        log.info(`[${this.agentName}] resolved /${skillName} → ${skillPath} (${skillContent.length} chars)`);
+      } else {
+        log.warn(`[${this.agentName}] skill file not found: ${skillPath}`);
+      }
+    }
+
     log.info(
       `[${this.agentName}] query — session=${this.sessionId.slice(0, 8)} resume=${this.resume}`
     );
 
     const textParts: string[] = [];
-    const q = query({ prompt: message, options });
+    const q = query({ prompt: resolvedPrompt, options });
 
     try {
       for await (const msg of q) {
@@ -103,8 +121,9 @@ class ClaudeSDKSession implements AgentSession {
         const msgType = (msg as Record<string, unknown>).type as string;
 
         if (msgType === "assistant" || msgType === "stream_event") {
-          const text =
-            (msg as Record<string, unknown>).content as string | undefined;
+          const raw = msg as Record<string, unknown>;
+          // SDK puts text in .message (not .content)
+          const text = (raw.message ?? raw.content) as string | undefined;
           if (text) {
             textParts.push(text);
             yield { type: "text_delta", text };
@@ -133,9 +152,20 @@ class ClaudeSDKSession implements AgentSession {
           }
         } else if (msgType === "result") {
           const result = msg as Record<string, unknown>;
+          log.info(`[${this.agentName}] result: turns=${result.num_turns} stop=${result.stop_reason} is_error=${result.is_error} cost=$${result.total_cost_usd ?? "?"} result=${String(result.result ?? "").slice(0, 200)}`);
+          // Capture the result text — the SDK puts the final answer here,
+          // not in assistant/stream_event content fields
+          const resultText = result.result as string | undefined;
+          if (resultText) {
+            textParts.push(resultText);
+            yield { type: "text_delta", text: resultText };
+          }
           const costUsd = result.total_cost_usd as number | undefined;
           if (costUsd != null) {
             yield { type: "cost", totalUsd: costUsd };
+          }
+          if (result.is_error) {
+            yield { type: "error", message: resultText || "Agent SDK returned an error" };
           }
           const stopReason =
             (result.stop_reason as string) ?? "end_turn";
@@ -147,6 +177,7 @@ class ClaudeSDKSession implements AgentSession {
       // If we exited the loop without a result message
       if (!this.cancelled) {
         const fullText = textParts.join("");
+        log.info(`[${this.agentName}] done (${fullText.length} chars)`);
         if (fullText) {
           yield { type: "text_done", text: fullText };
         }

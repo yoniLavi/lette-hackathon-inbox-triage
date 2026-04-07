@@ -119,3 +119,28 @@ Welfare emergency at Graylings Apt 13A: 7-day delay between report and emergency
 - Resident requests for planning submissions should be evaluated against: (1) legal standing, (2) impact on property rights, (3) duty of care to tenants
 - Timeline commitments for complex legal matters: allow 7-10 business days for management coordination and legal review
 
+## CRITICAL: Legal Deadline Monitoring
+
+**RTB Dispute Case DR-2026-0847 (April 2026) — Process Failure Documentation**
+
+RTB dispute response deadline missed by 4 days (due April 2, discovered April 6). Original notification email from March 5th was processed in April shift, revealing systematic deadline tracking failure.
+
+**Critical Pattern Identified:**
+- Legal notifications with fixed deadlines require IMMEDIATE calendar tracking and deadline monitoring
+- 28-day RTB response deadline is non-negotiable — missed deadlines risk automatic rulings against landlord
+- Email processing delays can cause catastrophic legal consequences if compliance deadlines pass unmonitored
+
+**Correct Legal Deadline Response:**
+- **All legal notifications = immediate deadline calculation and calendar entry**
+- Create urgent tasks with deadline dates, not just "not_started" status
+- Legal deadlines take priority over routine property management tasks
+- Flag overdue legal matters as EMERGENCY status requiring same-day senior management escalation
+- Consider automated deadline tracking systems to prevent email processing backlogs causing compliance failures
+
+**Process Improvements Required:**
+1. Legal email identification training (RTB, courts, Revenue, regulatory bodies)
+2. Automated deadline tracking for all legal notifications
+3. Priority routing of legal emails to prevent processing delays
+4. Senior management alerts for approaching legal deadlines
+5. Regular legal deadline compliance audits
+

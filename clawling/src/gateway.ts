@@ -171,11 +171,69 @@ export function createGateway(deps: GatewayDeps): Hono {
       return c.json({ error: "Agent is busy" }, 409);
     }
 
+    // For shift prompts, create the shift record in CRM before spawning the worker.
+    // The worker expects to find an in-progress shift record as its first step.
+    let shiftId: number | undefined;
+    if (prompt.trim() === "/shift") {
+      const crmUrl = process.env.CRM_API_URL || "http://localhost:8002";
+      try {
+        const resp = await fetch(`${crmUrl}/api/shifts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "in_progress", started_at: new Date().toISOString() }),
+        });
+        if (resp.status === 201) {
+          const data = await resp.json() as { id: number };
+          shiftId = data.id;
+          log.info(`[gateway] created shift record ${shiftId} in CRM`);
+        } else {
+          const text = await resp.text();
+          log.error(`[gateway] failed to create shift record: ${resp.status} ${text}`);
+          return c.json({ error: `Failed to create shift record: ${resp.status}` }, 500);
+        }
+      } catch (err) {
+        log.error(`[gateway] CRM unreachable for shift creation:`, err);
+        return c.json({ error: `CRM unreachable: ${err}` }, 502);
+      }
+    }
+
     // Spawn as a top-level delegation (no parent)
     try {
+      busyAgents.add(agentName);
       const taskId = await spawner.spawn("__wake__", agentName, prompt);
-      return c.json({ taskId });
+
+      // Clear busy state and update CRM shift record when the task completes
+      const clearBusy = setInterval(async () => {
+        const record = tracker.get(taskId);
+        if (record && record.status !== "running") {
+          busyAgents.delete(agentName);
+          clearInterval(clearBusy);
+
+          // Mark the CRM shift record as completed/failed
+          if (shiftId != null) {
+            const crmUrl = process.env.CRM_API_URL || "http://localhost:8002";
+            const shiftStatus = record.status === "completed" ? "completed" : "failed";
+            try {
+              await fetch(`${crmUrl}/api/shifts/${shiftId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  status: shiftStatus,
+                  completed_at: new Date().toISOString(),
+                  summary: record.result?.slice(0, 5000) ?? null,
+                }),
+              });
+              log.info(`[gateway] marked shift ${shiftId} as ${shiftStatus}`);
+            } catch (err) {
+              log.error(`[gateway] failed to update shift ${shiftId}:`, err);
+            }
+          }
+        }
+      }, 3000);
+
+      return c.json({ taskId, shiftId });
     } catch (err) {
+      busyAgents.delete(agentName);
       return c.json({ error: String(err) }, 500);
     }
   });
@@ -214,10 +272,12 @@ export function createGateway(deps: GatewayDeps): Hono {
   // -----------------------------------------------------------------------
   app.get("/session/status", (c) => {
     const workerBusy = busyAgents.has("worker");
+    const runningTask = tracker.getRunningByAgent("worker");
     return c.json({
       active: busyAgents.size > 0,
-      busy: workerBusy,
-      shift_active: workerBusy ? true : null,
+      busy: workerBusy || !!runningTask,
+      shift_active: workerBusy || !!runningTask ? true : null,
+      taskId: runningTask?.taskId ?? null,
     });
   });
 
