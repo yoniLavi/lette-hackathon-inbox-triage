@@ -8,4 +8,6 @@ temporary-scripts/
 screen-recordings/
 **/node_modules/
 **/dist/
+# npm lockfiles generated inside containers (pnpm-lock.yaml is the source of truth)
+packages/**/package-lock.json
 .next/
