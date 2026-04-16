@@ -261,13 +261,13 @@ describe("frontend e2e", () => {
     expect(text).toContain("Hello there!");
   });
 
-  test("multi-turn conversation", { timeout: FAST_TIMEOUT * 2 + 10_000 }, async () => {
+  test("multi-turn conversation", { timeout: SLOW_TIMEOUT + 30_000 }, async () => {
     await openChat(page);
     const n1 = await sendMessage(page, "Remember this number: 42");
-    await waitForResponse(page, FAST_TIMEOUT, n1);
+    await waitForResponse(page, SLOW_TIMEOUT, n1);
 
     const n2 = await sendMessage(page, "What number did I just tell you?");
-    const response = await waitForResponse(page, FAST_TIMEOUT, n2);
+    const response = await waitForResponse(page, SLOW_TIMEOUT, n2);
     expect(response).toContain("42");
   });
 

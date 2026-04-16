@@ -160,6 +160,7 @@ class MessagesAPISession implements AgentSession {
     const maxTurns = this.agentConfig.maxTurns;
 
     const allText: string[] = [];
+    let hasEmittedText = false;
 
     for (let turn = 0; turn < maxTurns; turn++) {
       if (this.cancelled) break;
@@ -190,8 +191,16 @@ class MessagesAPISession implements AgentSession {
 
       for (const block of response.content) {
         if (block.type === "text" && block.text) {
+          // Separate distinct text blocks with a paragraph break so that
+          // text before a tool call isn't concatenated with text after it
+          // (e.g. "deadline.Start with..." → "deadline.\n\nStart with...")
+          if (hasEmittedText) {
+            allText.push("\n\n");
+            yield { type: "text_delta", text: "\n\n" };
+          }
           allText.push(block.text);
           yield { type: "text_delta", text: block.text };
+          hasEmittedText = true;
         } else if (block.type === "tool_use") {
           toolUses.push(block);
         }

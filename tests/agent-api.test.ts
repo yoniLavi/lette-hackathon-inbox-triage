@@ -5,7 +5,7 @@
  *   docker compose up -d
  */
 
-import { describe, test, expect, beforeAll, afterAll } from "vitest";
+import { test, expect, beforeAll, afterAll } from "vitest";
 
 const AGENT_URL = process.env.AGENT_URL || "http://localhost:8001";
 
@@ -122,6 +122,38 @@ test("status unknown task", async () => {
   const { status, data } = await api("GET", "/v1/status/nonexistent-id");
   expect(status).toBe(404);
   expect(data.status).toBe("not_found");
+});
+
+test("multi-block response separates text blocks", async () => {
+  // Bug reproducer: when the LLM generates text, calls a tool, then generates
+  // more text, the text blocks were concatenated with no separator — producing
+  // "wordA.WordB" where two sentences run together.
+  //
+  // Use a prompt with rich page context that typically triggers: text → tool → text.
+  const { status, data } = await api("POST", "/v1/chat/completions", {
+    model: "clawling/frontend",
+    stream: false,
+    messages: [
+      {
+        role: "user",
+        content:
+          '[Page context: {"page":"dashboard","openCaseCount":10,"stats":{"urgentCount":5,"pendingTasks":25},"topCases":[{"id":1,"name":"Fire safety compliance at Citynorth Quarter","priority":"urgent","description":"Dublin Fire Brigade deadline missed by 19 days"},{"id":2,"name":"Overdue Crest Electrical payment","priority":"urgent","description":"61 days past due, threatening work hold"}]}]\n\nQuick overview please - what should I tackle first?',
+      },
+    ],
+  });
+  expect(status).toBe(200);
+
+  const content = (
+    data.choices as { message: { content: string } }[]
+  )[0].message.content;
+
+  // Look for run-on sentence pattern: ".Word" (period immediately followed by capital letter,
+  // no whitespace). This is the bug signature from multi-block concatenation.
+  const runOnMatch = content.match(/\.([A-Z][a-z])/);
+  expect(
+    runOnMatch,
+    `Run-on sentences detected — text blocks not separated. Content: ${JSON.stringify(content)}`,
+  ).toBeNull();
 });
 
 test("wake worker returns task id", async () => {
