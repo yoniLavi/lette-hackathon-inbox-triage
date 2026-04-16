@@ -88,16 +88,41 @@ crm emails bulk-update --json '{"ids": [1,2,3], "updates": {"is_read": true}}'
 ```
 
 ### Create entities
+
+**ALWAYS use `--stdin` with a heredoc when your JSON contains newlines** (in
+`description`, `content`, `body`, etc). Passing `\n` via `--json '...'` on a
+shell command requires careful escaping that is easy to get wrong — writing
+`\\n` in the JSON body produces a literal backslash-n in the database, which
+breaks markdown rendering downstream. The heredoc form below passes JSON
+byte-for-byte with no shell interpretation, so `\n` gets stored as a real
+newline.
+
 ```bash
-crm emails create --json '{"subject": "Re: Water leak", "body": "Draft reply...", "status": "draft", "from_address": "manager@manageco.ie", "to_addresses": ["tenant@gmail.com"], "thread_id": "thread_001", "case_id": 5}'
-crm tasks create --json '{"name": "Assign emergency plumber", "status": "not_started", "priority": "urgent", "case_id": 3, "description": "..."}'
-crm notes create --json '{"content": "**Water Leak** (from Eoin Byrne) — Emergency. Drafted reply, created task.", "case_id": 3}'
-crm notes create --json '{"content": "**Thread: Water leak** — Emergency. Created case, drafted reply.", "shift_id": 5}'
+# Preferred pattern for any content with newlines (tasks, cases, notes, drafts)
+crm tasks create --stdin <<'EOF'
+{"name":"Assign emergency plumber","status":"not_started","priority":"urgent","case_id":3,"description":"**Urgent**\n\n1. Dispatch plumber\n2. Notify tenant"}
+EOF
+
+crm notes create --stdin <<'EOF'
+{"content":"**Thread: Water leak** — Emergency. Created case, drafted reply.","shift_id":5}
+EOF
+
+crm emails create --stdin <<'EOF'
+{"subject":"Re: Water leak","body":"Hi Eoin,\n\nThank you for reporting this...","status":"draft","from_address":"manager@manageco.ie","to_addresses":["eoin@example.com"],"thread_id":"thread_001","case_id":5}
+EOF
+
+# --json '...' is fine for simple single-line payloads
+crm tasks create --json '{"name":"Review report","status":"not_started","priority":"normal","case_id":3}'
 ```
 
 ### Update entities
 ```bash
-crm cases update 3 --json '{"status": "closed", "description": "Processed 5 emails."}'
+# Use --stdin when updating a description/body/content field
+crm cases update 3 --stdin <<'EOF'
+{"status":"closed","description":"Processed 5 emails.\n\nResolution: tenant satisfied, contractor booked."}
+EOF
+
+# --json is fine for simple scalar updates
 crm emails update 42 --json '{"is_read": true}'
 ```
 
