@@ -490,6 +490,13 @@ apiRoutes.delete("/api/:entity", async (c) => {
   const table = ENTITY_TABLES[entityName];
   if (!table) return c.json({ detail: `Unknown entity: ${entityName}` }, 404);
 
+  if (c.req.header("x-confirm-destructive") !== "true") {
+    return c.json(
+      { detail: "Bulk delete requires header: x-confirm-destructive: true" },
+      400,
+    );
+  }
+
   const result = await db.delete(table);
   log("Deleted all %s (%d rows)", entityName, result.rowCount ?? 0);
   return c.json({ deleted: true, count: result.rowCount ?? 0 });

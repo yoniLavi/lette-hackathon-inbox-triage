@@ -1,0 +1,298 @@
+{
+  "_comment": "Auto-generated E2E test fixture. Do not edit manually. Re-generate with: npx tsx scripts/snapshot-fixture.ts",
+  "properties": [],
+  "cases": [
+    {
+      "name": "URGENT: Overdue Payment - Crest Electrical Invoice #4892",
+      "status": "new",
+      "priority": "urgent",
+      "description": "Severely overdue invoice from Crest Electrical for emergency lighting work at Graylings (€3,240 + VAT). Originally 19 days overdue on March 5th, now 61+ days overdue. Contractor threatening work hold affecting 2 Citynorth Quarter jobs. Immediate payment required to maintain contractor relationship.",
+      "property_id": null
+    },
+    {
+      "name": "EMERGENCY: Fire Safety Non-Compliance - Citynorth Quarter",
+      "status": "new",
+      "priority": "urgent",
+      "description": "Dublin Fire Brigade inspection found 4 non-compliant fire safety issues at Citynorth Quarter. Remediation deadline March 27th MISSED by 19 days. Issues: faulty fire doors (floors 3,7,10), blocked escape stairwell, missing bin store suppression, inadequate emergency lighting. Risk of enforcement action/closure orders.",
+      "property_id": null
+    },
+    {
+      "name": "EMERGENCY: Heating Failure - Infant Welfare & Legal Threat",
+      "status": "new",
+      "priority": "urgent",
+      "description": "Serious heating failure at Reds Works property with infant present. Threshold Housing Advice CC-d management company advising tenant Grainne about 3-day heating outage. Threshold recommending RTB dispute and local authority complaint. Urgent response required - child welfare and legal compliance at risk.",
+      "property_id": null
+    }
+  ],
+  "emails": [
+    {
+      "subject": "Re: URGENT - Payment Processing Invoice #4892",
+      "from_address": "accounts@manageco.ie",
+      "to_addresses": [
+        "accounts@crestelectrical.ie"
+      ],
+      "cc_addresses": [
+        "aisling.murphy@manageco.ie"
+      ],
+      "body": "Dear Mairead,\\n\\nWe sincerely apologise for the unacceptable delay in payment of Invoice #4892 for the emergency lighting work at Graylings.\\n\\nWe acknowledge that this invoice is now significantly overdue and we take full responsibility for this oversight. Your emergency work was completed professionally and on time, and you deserve prompt payment.\\n\\n**IMMEDIATE ACTION:**\\n- Payment of €3,240.00 + VAT is being processed today\\n- You will receive payment confirmation within 24 hours\\n- We will call you this afternoon to confirm details\\n\\n**Request:**\\nWe urgently request that you proceed with the scheduled work at Citynorth Quarter as planned. These jobs are critical for fire safety compliance.\\n\\nWe are implementing immediate changes to our accounts payable procedures to prevent future delays with your invoices.\\n\\nThank you for your patience and continued professional service.\\n\\nUrgent regards,\\n\\nAccounts Department\\nManageCo Property Management",
+      "body_plain": null,
+      "date_sent": null,
+      "status": "draft",
+      "is_read": false,
+      "is_replied": false,
+      "is_important": false,
+      "message_id": null,
+      "in_reply_to": null,
+      "thread_id": "thread_006",
+      "thread_position": null,
+      "challenge_id": null,
+      "case_id": 115
+    },
+    {
+      "subject": "Overdue Invoice #4892 - Graylings emergency lighting",
+      "from_address": "accounts@crestelectrical.ie",
+      "to_addresses": [
+        "accounts@manageco.ie"
+      ],
+      "cc_addresses": [
+        "aisling.murphy@manageco.ie"
+      ],
+      "body": "Hi,\n\nThis is a follow-up regarding Invoice #4892 for the emergency lighting replacement works completed at Graylings on January 15th, 2026.\n\nInvoice amount: €3,240.00 + VAT\nPayment terms: 30 days\nDue date: February 14th, 2026\nDays overdue: 19 days\n\nWe completed this work on an emergency basis over a weekend at your request. We've sent two reminders already (Feb 18th and Feb 28th) with no response.\n\nPlease arrange payment within 7 days or we'll need to put a hold on any further work at your properties until the account is cleared. We have two jobs scheduled at citynorth Quarter next week that would be affected.\n\nKind regards,\nMairead Coyne\nAccounts Department\nCrest Electrical Ltd",
+      "body_plain": "Hi,\n\nThis is a follow-up regarding Invoice #4892 for the emergency lighting replacement works completed at Graylings on January 15th, 2026.\n\nInvoice amount: €3,240.00 + VAT\nPayment terms: 30 days\nDue date: February 14th, 2026\nDays overdue: 19 days\n\nWe completed this work on an emergency basis over a weekend at your request. We've sent two reminders already (Feb 18th and Feb 28th) with no response.\n\nPlease arrange payment within 7 days or we'll need to put a hold on any further work at your properties until the account is cleared. We have two jobs scheduled at citynorth Quarter next week that would be affected.\n\nKind regards,\nMairead Coyne\nAccounts Department\nCrest Electrical Ltd",
+      "date_sent": "2026-03-05T14:33:00.000Z",
+      "status": "archived",
+      "is_read": true,
+      "is_replied": false,
+      "is_important": false,
+      "message_id": "<email_008@proptech-challenge>",
+      "in_reply_to": null,
+      "thread_id": "thread_006",
+      "thread_position": 1,
+      "challenge_id": "email_008",
+      "case_id": 115
+    },
+    {
+      "subject": "Re: URGENT - Fire Safety Remediation Plan - Citynorth Quarter",
+      "from_address": "sarah.brennan@manageco.ie",
+      "to_addresses": [
+        "fire.safety@dublinfire.ie"
+      ],
+      "cc_addresses": null,
+      "body": "Dear Dublin Fire Brigade Fire Prevention Section,\\n\\nWe acknowledge receipt of the fire safety inspection report for Citynorth Quarter dated March 5th, 2026.\\n\\nWe sincerely apologise for our delayed response to your remediation requirements. This delay is unacceptable given the critical nature of fire safety compliance.\\n\\n**IMMEDIATE REMEDIATION PLAN:**\\n\\n**Week 1 (Immediate Actions):**\\n- Fire doors Floors 3, 7, 10: Emergency contractor engaged, repairs within 48 hours\\n- Fire escape stairwell Floor 4: Items removed immediately, compliance signage installed\\n- Emergency lighting car park: Contractor testing and battery replacement within 3 days\\n\\n**Week 2-3:**\\n- Bin store fire suppression system: Contractors engaged, installation scheduling (requires planning approval)\\n\\n**Completion Timeline:**\\nAll items except bin store suppression: Completed by April 22nd\\nBin store suppression system: Completed by May 6th (pending approvals)\\n\\n**Immediate Contact:**\\nWe will call your office today to discuss this timeline and any enforcement implications.\\n\\nWe take full responsibility for this delay and are implementing enhanced compliance monitoring to prevent future occurrences.\\n\\nUrgent regards,\\n\\nSarah Brennan\\nFire Safety Compliance Manager\\nCitynorth Quarter Management",
+      "body_plain": null,
+      "date_sent": null,
+      "status": "draft",
+      "is_read": false,
+      "is_replied": false,
+      "is_important": false,
+      "message_id": null,
+      "in_reply_to": null,
+      "thread_id": "thread_091",
+      "thread_position": null,
+      "challenge_id": null,
+      "case_id": 114
+    },
+    {
+      "subject": "Fire safety inspection report - citynorth Quarter",
+      "from_address": "fire.safety@dublinfire.ie",
+      "to_addresses": [
+        "sarah.brennan@manageco.ie"
+      ],
+      "cc_addresses": null,
+      "body": "Dear Ms. Brennan,\n\nPlease find attached the fire safety inspection report for citynorth Quarter following our inspection on February 27th, 2026.\n\nKey findings:\n\nCOMPLIANT:\n- Fire detection and alarm system\n- Emergency lighting (common areas)\n- Fire extinguisher locations and servicing\n- Evacuation signage\n- Fire safety register (mostly complete)\n\nNON-COMPLIANT (must be addressed within 28 days):\n1. Fire doors on Floors 3, 7, and 10 — door closers not functioning correctly\n2. Fire escape stairwell Floor 4 — items stored in stairwell (fire hazard)\n3. Bin store — no automatic fire suppression system (required for enclosed bin stores in multi-storey residential)\n4. Emergency lighting battery backup in car park — below minimum duration\n\nRECOMMENDATIONS:\n- Upgrade fire door inspection regime to quarterly\n- Install additional smoke detection in car park areas\n- Review fire evacuation procedure for mobility-impaired residents\n\nPlease provide a remediation plan by March 27th, 2026.\n\nDublin Fire Brigade, Fire Prevention Section",
+      "body_plain": "Dear Ms. Brennan,\n\nPlease find attached the fire safety inspection report for citynorth Quarter following our inspection on February 27th, 2026.\n\nKey findings:\n\nCOMPLIANT:\n- Fire detection and alarm system\n- Emergency lighting (common areas)\n- Fire extinguisher locations and servicing\n- Evacuation signage\n- Fire safety register (mostly complete)\n\nNON-COMPLIANT (must be addressed within 28 days):\n1. Fire doors on Floors 3, 7, and 10 — door closers not functioning correctly\n2. Fire escape stairwell Floor 4 — items stored in stairwell (fire hazard)\n3. Bin store — no automatic fire suppression system (required for enclosed bin stores in multi-storey residential)\n4. Emergency lighting battery backup in car park — below minimum duration\n\nRECOMMENDATIONS:\n- Upgrade fire door inspection regime to quarterly\n- Install additional smoke detection in car park areas\n- Review fire evacuation procedure for mobility-impaired residents\n\nPlease provide a remediation plan by March 27th, 2026.\n\nDublin Fire Brigade, Fire Prevention Section",
+      "date_sent": "2026-03-05T14:10:00.000Z",
+      "status": "archived",
+      "is_read": true,
+      "is_replied": false,
+      "is_important": false,
+      "message_id": "<email_098@proptech-challenge>",
+      "in_reply_to": null,
+      "thread_id": "thread_091",
+      "thread_position": 1,
+      "challenge_id": "email_098",
+      "case_id": 114
+    },
+    {
+      "subject": "Re: Urgent Response - Heating Failure Emergency Action Plan",
+      "from_address": "redsworks@manageco.ie",
+      "to_addresses": [
+        "advice@threshold.ie"
+      ],
+      "cc_addresses": [
+        "emer.crowley92@outlook.com"
+      ],
+      "body": "Dear Threshold Housing Advice,\\n\\nWe acknowledge receipt of your correspondence regarding the heating failure affecting Grainne and her infant child at our Reds Works property.\\n\\nWe take this matter extremely seriously and sincerely apologise for any delay in addressing this critical issue. The safety and welfare of our residents, particularly families with young children, is our highest priority.\\n\\n**Immediate Actions Being Taken:**\\n1. Emergency contact with the tenant within 2 hours to assess current situation\\n2. Urgent heating engineer dispatch if any issues remain unresolved\\n3. Comprehensive review of maintenance response procedures\\n4. Alternative accommodation arrangements if required for child safety\\n\\n**Our Commitment:**\\nWe are committed to ensuring full compliance with our obligations under the Residential Tenancies Act 2004 and Housing Standards Regulations 2019. We will provide a full update on actions taken and resolution achieved within 24 hours.\\n\\nWe thank you for bringing this to our attention and for your advocacy on behalf of residents.\\n\\nUrgent regards,\\n\\nReds Works Management Team\\nManageCo Property Management",
+      "body_plain": null,
+      "date_sent": null,
+      "status": "draft",
+      "is_read": false,
+      "is_replied": false,
+      "is_important": false,
+      "message_id": null,
+      "in_reply_to": null,
+      "thread_id": "thread_063",
+      "thread_position": null,
+      "challenge_id": null,
+      "case_id": 113
+    },
+    {
+      "subject": "Re: Your query - Heating obligation",
+      "from_address": "advice@threshold.ie",
+      "to_addresses": [
+        "emer.crowley92@outlook.com"
+      ],
+      "cc_addresses": [
+        "redsworks@manageco.ie"
+      ],
+      "body": "Dear Grainne,\n\nThank you for contacting Threshold. We've reviewed the details you've provided regarding the heating failure at your apartment.\n\nUnder Section 12(1)(b) of the Residential Tenancies Act 2004, your landlord is obligated to maintain the property in a proper state of repair. The Housing (Standards for Rented Houses) Regulations 2019 specifically require that heating facilities are maintained in good repair and working order.\n\nA heating failure lasting 3 days, particularly with a young infant in the property, is a serious breach. We recommend:\n\n1. Send a written notice to your landlord/agent by email (for a paper trail) detailing the issue, the dates reported, and the lack of response\n2. Set a reasonable deadline (48 hours given the circumstances)\n3. If not resolved, you can refer the matter to the RTB for dispute resolution\n4. You may also contact your local authority's Environmental Health Officer, as this could constitute a housing standards breach\n\nWe're CC'ing your management company on this email for their attention.\n\nWarm regards,\nThreshold Housing Advice",
+      "body_plain": "Dear Grainne,\n\nThank you for contacting Threshold. We've reviewed the details you've provided regarding the heating failure at your apartment.\n\nUnder Section 12(1)(b) of the Residential Tenancies Act 2004, your landlord is obligated to maintain the property in a proper state of repair. The Housing (Standards for Rented Houses) Regulations 2019 specifically require that heating facilities are maintained in good repair and working order.\n\nA heating failure lasting 3 days, particularly with a young infant in the property, is a serious breach. We recommend:\n\n1. Send a written notice to your landlord/agent by email (for a paper trail) detailing the issue, the dates reported, and the lack of response\n2. Set a reasonable deadline (48 hours given the circumstances)\n3. If not resolved, you can refer the matter to the RTB for dispute resolution\n4. You may also contact your local authority's Environmental Health Officer, as this could constitute a housing standards breach\n\nWe're CC'ing your management company on this email for their attention.\n\nWarm regards,\nThreshold Housing Advice",
+      "date_sent": "2026-03-05T14:00:00.000Z",
+      "status": "archived",
+      "is_read": true,
+      "is_replied": false,
+      "is_important": false,
+      "message_id": "<email_069@proptech-challenge>",
+      "in_reply_to": null,
+      "thread_id": "thread_063",
+      "thread_position": 1,
+      "challenge_id": "email_069",
+      "case_id": 113
+    }
+  ],
+  "tasks": [
+    {
+      "name": "URGENT: Process Payment - Crest Electrical Invoice #4892",
+      "status": "not_started",
+      "priority": "urgent",
+      "description": "**IMMEDIATE PAYMENT REQUIRED**\\n\\n**Invoice:** #4892\\n**Amount:** €3,240.00 + VAT\\n**Work:** Emergency lighting replacement at Graylings\\n**Overdue:** 61+ days\\n\\n**Actions needed TODAY:**\\n1. Locate and verify invoice #4892 in accounts system\\n2. Confirm work completion and acceptance\\n3. Process immediate payment (same day if possible)\\n4. Send payment confirmation to Crest Electrical\\n5. Apologize for delay and confirm payment timeline\\n6. Update contractor records and payment procedures",
+      "date_start": null,
+      "date_end": null,
+      "case_id": 115,
+      "contact_id": 583
+    },
+    {
+      "name": "URGENT: Contact Crest Electrical - Prevent Work Hold",
+      "status": "not_started",
+      "priority": "urgent",
+      "description": "**Prevent contractor work hold immediately**\\n\\n**Contact:** Mairead Coyne - accounts@crestelectrical.ie\\n**Threat:** Hold on work affecting Citynorth Quarter jobs\\n\\n**Actions needed:**\\n1. Call Crest Electrical immediately\\n2. Apologize for significant payment delay\\n3. Confirm payment being processed today\\n4. Request continuation of scheduled Citynorth Quarter work\\n5. Discuss any late payment penalties/interest\\n6. Confirm future payment terms and procedures\\n7. Document agreement and follow up in writing",
+      "date_start": null,
+      "date_end": null,
+      "case_id": 115,
+      "contact_id": 583
+    },
+    {
+      "name": "EMERGENCY: Fix Fire Doors - Floors 3, 7, 10",
+      "status": "not_started",
+      "priority": "urgent",
+      "description": "**IMMEDIATE ACTION - Fire door closers not functioning**\\n\\n**Property:** Citynorth Quarter\\n**Issue:** Fire door closers on Floors 3, 7, and 10 not working correctly\\n**Deadline:** March 27 (MISSED)\\n\\n**Actions needed TODAY:**\\n1. Arrange immediate fire door engineer inspection\\n2. Replace/repair all faulty door closers on affected floors\\n3. Test all fire doors for proper closure and sealing\\n4. Update fire door inspection log\\n5. Photograph completed work for DFB evidence\\n6. Arrange urgent certification of completion",
+      "date_start": null,
+      "date_end": null,
+      "case_id": 114,
+      "contact_id": 656
+    },
+    {
+      "name": "EMERGENCY: Clear Fire Escape Stairwell Floor 4",
+      "status": "not_started",
+      "priority": "urgent",
+      "description": "**IMMEDIATE ACTION - Blocked fire escape route**\\n\\n**Property:** Citynorth Quarter Floor 4\\n**Issue:** Items stored in fire escape stairwell creating fire hazard\\n**Deadline:** March 27 (MISSED)\\n\\n**Actions needed TODAY:**\\n1. Immediately remove all stored items from stairwell\\n2. Check entire stairwell for damage or additional hazards\\n3. Install prominent signage about keeping stairwells clear\\n4. Update building management procedures\\n5. Photograph cleared stairwell for DFB evidence\\n6. Schedule weekly compliance checks",
+      "date_start": null,
+      "date_end": null,
+      "case_id": 114,
+      "contact_id": 656
+    },
+    {
+      "name": "URGENT: Install Bin Store Fire Suppression System",
+      "status": "not_started",
+      "priority": "urgent",
+      "description": "**Major installation required - Fire suppression system**\\n\\n**Property:** Citynorth Quarter bin store\\n**Issue:** No automatic fire suppression in enclosed bin store (code requirement)\\n**Deadline:** March 27 (MISSED)\\n\\n**Actions needed:**\\n1. Contact fire suppression system contractors immediately\\n2. Get quotes and specifications for compliant system\\n3. Arrange planning/building approval if required\\n4. Schedule urgent installation (may take several days)\\n5. Arrange DFB inspection upon completion\\n6. Update fire safety certificate and documentation",
+      "date_start": null,
+      "date_end": null,
+      "case_id": 114,
+      "contact_id": 656
+    },
+    {
+      "name": "URGENT: Fix Emergency Lighting Car Park",
+      "status": "not_started",
+      "priority": "urgent",
+      "description": "**Emergency lighting battery backup insufficient**\\n\\n**Property:** Citynorth Quarter car park\\n**Issue:** Emergency lighting battery backup below minimum duration\\n**Deadline:** March 27 (MISSED)\\n\\n**Actions needed:**\\n1. Contact emergency lighting contractor immediately\\n2. Test all car park emergency lighting units\\n3. Replace batteries or entire units as needed\\n4. Ensure minimum 3-hour backup duration compliance\\n5. Test and certify system functionality\\n6. Provide certification to DFB",
+      "date_start": null,
+      "date_end": null,
+      "case_id": 114,
+      "contact_id": 656
+    },
+    {
+      "name": "EMERGENCY: Contact Dublin Fire Brigade - Late Response",
+      "status": "not_started",
+      "priority": "urgent",
+      "description": "**Contact DFB immediately about missed deadline**\\n\\n**Contact:** Dublin Fire Brigade Fire Prevention Section\\n**Email:** fire.safety@dublinfire.ie\\n**Deadline missed:** March 27 (19 days overdue)\\n\\n**Actions needed TODAY:**\\n1. Call DFB Fire Prevention Section immediately\\n2. Explain delay and apologize for missed deadline\\n3. Provide detailed remediation timeline with completion dates\\n4. Request guidance on enforcement implications\\n5. Schedule follow-up inspection once work completed\\n6. Confirm no interim enforcement action required",
+      "date_start": null,
+      "date_end": null,
+      "case_id": 114,
+      "contact_id": 656
+    },
+    {
+      "name": "EMERGENCY: Check Heating Status - Infant Welfare Issue",
+      "status": "not_started",
+      "priority": "urgent",
+      "description": "**IMMEDIATE ACTION - Child welfare at risk**\\n\\n**Tenant:** Grainne (emer.crowley92@outlook.com)\\n**Property:** Reds Works (exact unit unknown)\\n**Issue:** 3-day heating failure with infant present\\n**Date:** Reported before March 5, 2026\\n\\n**Actions needed TODAY:**\\n1. Contact tenant Grainne immediately to check current heating status\\n2. If heating still not working - arrange emergency repair within 2 hours\\n3. Identify specific unit address\\n4. Check maintenance logs for previous heating reports\\n5. Verify heating system is fully functional\\n6. Document current status and actions taken",
+      "date_start": null,
+      "date_end": null,
+      "case_id": 113,
+      "contact_id": 634
+    },
+    {
+      "name": "URGENT: Check Legal Status - RTB/Environmental Health",
+      "status": "not_started",
+      "priority": "urgent",
+      "description": "**Check if legal action has been taken**\\n\\n**Tenant:** Grainne at Reds Works\\n**Threshold advice date:** March 5, 2026\\n**Potential actions:** RTB dispute, Environmental Health complaint\\n\\n**Actions needed:**\\n1. Search RTB database for any disputes filed by Grainne/emer.crowley92@outlook.com\\n2. Contact local Environmental Health Officer to check for complaints\\n3. Review any legal correspondence received\\n4. Prepare response strategy if legal action pending\\n5. Contact company legal advisor if dispute filed\\n6. Document findings and timeline",
+      "date_start": null,
+      "date_end": null,
+      "case_id": 113,
+      "contact_id": 634
+    },
+    {
+      "name": "URGENT: Contact Tenant - Immediate Response Required",
+      "status": "not_started",
+      "priority": "urgent",
+      "description": "**Contact tenant immediately to address situation**\\n\\n**Tenant:** Grainne (emer.crowley92@outlook.com)\\n**Issue:** Heating failure with infant present\\n**Threshold advice received:** March 5, 2026\\n\\n**Actions needed:**\\n1. Call tenant immediately to apologize for delayed response\\n2. Assess current heating status and family situation\\n3. If heating issues persist - arrange immediate temporary heating solution\\n4. Schedule emergency heating engineer visit within 24 hours\\n5. Offer alternative accommodation if needed for infant safety\\n6. Document all communications and commitments made",
+      "date_start": null,
+      "date_end": null,
+      "case_id": 113,
+      "contact_id": 634
+    }
+  ],
+  "notes": [],
+  "threads": [
+    {
+      "thread_id": "thread_091",
+      "subject": "Fire safety inspection report - citynorth Quarter",
+      "last_activity_at": "2026-03-05T14:10:00.000Z",
+      "email_count": 2,
+      "is_read": true,
+      "case_id": 114,
+      "property_id": 52,
+      "contact_id": 577
+    },
+    {
+      "thread_id": "thread_063",
+      "subject": "Re: Urgent Response - Heating Failure Emergency Action Plan",
+      "last_activity_at": "2026-03-05T14:00:00.000Z",
+      "email_count": 2,
+      "is_read": true,
+      "case_id": 113,
+      "property_id": null,
+      "contact_id": null
+    },
+    {
+      "thread_id": "thread_006",
+      "subject": "Overdue Invoice #4892 - Graylings emergency lighting",
+      "last_activity_at": "2026-03-05T14:33:00.000Z",
+      "email_count": 2,
+      "is_read": true,
+      "case_id": 115,
+      "property_id": null,
+      "contact_id": 641
+    }
+  ]
+}
