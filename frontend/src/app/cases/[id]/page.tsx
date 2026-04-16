@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getCase, getRelatedEmails, getRelatedTasks, getNotes, contactName, senderDisplay, updateCase, updateTask, updateEmail } from "@/lib/crm";
 import type { CrmCase, CrmEmail, CrmTask, CrmNote, CrmContact } from "@/lib/crm";
 import { usePageData, buildSituationContext } from "@/lib/page-context";
+import { unescapeMarkdown } from "@/lib/unescape-markdown";
 import ReactMarkdown from "react-markdown";
 import { UrgencyBadge } from "@/components/ui/Badge";
 import { ContactBadge } from "@/components/ui/ContactBadge";
@@ -328,7 +329,7 @@ export default function SituationDetail() {
                                     </div>
                                     <div className="p-5">
                                         <div className="text-[#0F1016] leading-relaxed font-sans text-[15px] prose prose-sm max-w-none">
-                                            <ReactMarkdown>{crmCase.description}</ReactMarkdown>
+                                            <ReactMarkdown>{unescapeMarkdown(crmCase.description)}</ReactMarkdown>
                                         </div>
                                     </div>
                                 </Card>
@@ -380,7 +381,7 @@ export default function SituationDetail() {
                                                         </div>
                                                         {task.description && (
                                                             <div className="text-sm text-[#0F1016]/80 mt-2 bg-white/50 border border-[#0F1016]/5 p-2 rounded italic prose prose-sm max-w-none">
-                                                                <ReactMarkdown>{task.description}</ReactMarkdown>
+                                                                <ReactMarkdown>{unescapeMarkdown(task.description)}</ReactMarkdown>
                                                             </div>
                                                         )}
                                                     </div>

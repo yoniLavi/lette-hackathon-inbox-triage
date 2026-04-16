@@ -5,6 +5,7 @@ import { Check, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { updateEmail, deleteEmail } from "@/lib/crm";
 import type { CrmEmail } from "@/lib/crm";
+import { unescapeMarkdown } from "@/lib/unescape-markdown";
 
 function useAutoResize(ref: React.RefObject<HTMLTextAreaElement | null>, value: string) {
     useEffect(() => {
@@ -21,7 +22,7 @@ export function DraftEditor({ email, onUpdate, onDiscard, className }: {
     onDiscard?: () => void;
     className?: string;
 }) {
-    const plainBody = email.body_plain || email.body?.replace(/<[^>]*>/g, '') || "";
+    const plainBody = unescapeMarkdown(email.body_plain || email.body?.replace(/<[^>]*>/g, '') || "");
     const [body, setBody] = useState(plainBody);
     const [saving, setSaving] = useState(false);
     const [dirty, setDirty] = useState(false);
@@ -32,7 +33,7 @@ export function DraftEditor({ email, onUpdate, onDiscard, className }: {
 
     // Reset when email changes
     useEffect(() => {
-        const newBody = email.body_plain || email.body?.replace(/<[^>]*>/g, '') || "";
+        const newBody = unescapeMarkdown(email.body_plain || email.body?.replace(/<[^>]*>/g, '') || "");
         setBody(newBody);
         setDirty(false);
     }, [email.id]);

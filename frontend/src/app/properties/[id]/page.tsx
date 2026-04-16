@@ -9,6 +9,7 @@ import { getProperty, getCases, getContacts, getThreads } from "@/lib/crm";
 import type { CrmProperty, CrmCase, CrmContact, CrmThread } from "@/lib/crm";
 import { contactName } from "@/lib/crm";
 import { usePageData, buildPropertyDetailContext } from "@/lib/page-context";
+import { unescapeMarkdown } from "@/lib/unescape-markdown";
 import { SituationCard } from "@/components/dashboard/SituationCard";
 import { ContactBadge } from "@/components/ui/ContactBadge";
 import { Card } from "@/components/ui/Card";
@@ -102,7 +103,7 @@ export default function PropertyDetail() {
                     </div>
                     {property.description && (
                         <div className="mt-3 text-sm text-[#0F1016]/70 prose prose-sm max-w-none">
-                            <ReactMarkdown>{property.description}</ReactMarkdown>
+                            <ReactMarkdown>{unescapeMarkdown(property.description)}</ReactMarkdown>
                         </div>
                     )}
                 </div>

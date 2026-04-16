@@ -381,6 +381,25 @@ describe("frontend e2e", () => {
 
   // --- Page context enrichment tests ---
 
+  test("case page does not show literal escape sequences", async () => {
+    // Regression guard: the worker agent sometimes writes "\\n" (literal
+    // backslash-n) in JSON passed via bash, which gets stored verbatim and
+    // previously rendered as "\n\n" in the UI. The unescapeMarkdown helper
+    // normalizes these at display time.
+    const caseId = firstCaseId();
+    await page.goto(`${FRONTEND_URL}/cases/${caseId}`, {
+      waitUntil: "networkidle",
+    });
+    await page.waitForSelector("[data-ai-target^='task-']", { timeout: 10_000 });
+
+    const bodyText = await page.locator("body").innerText();
+    const literalEscapes = bodyText.match(/\\n/g) || [];
+    expect(
+      literalEscapes.length,
+      `Rendered page contains ${literalEscapes.length} literal "\\\\n" escape sequences — unescapeMarkdown may be missing`,
+    ).toBe(0);
+  });
+
   test("situation has ai-target attributes", async () => {
     const caseId = firstCaseId();
     await page.goto(`${FRONTEND_URL}/cases/${caseId}`, {

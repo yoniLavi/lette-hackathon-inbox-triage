@@ -8,6 +8,7 @@ import { ContactBadge } from "@/components/ui/ContactBadge";
 import { searchEmails, senderDisplay } from "@/lib/crm";
 import type { CrmEmail } from "@/lib/crm";
 import { usePageData, buildSearchContext } from "@/lib/page-context";
+import { unescapeMarkdown } from "@/lib/unescape-markdown";
 import { formatDistanceToNow } from "date-fns";
 
 export default function SearchPage() {
@@ -74,7 +75,7 @@ export default function SearchPage() {
                         </h2>
                         {results.map(email => {
                             const sender = senderDisplay(email);
-                            const bodySnippet = (email.body_plain || email.body || "").replace(/<[^>]*>/g, '').slice(0, 200);
+                            const bodySnippet = unescapeMarkdown(email.body_plain || email.body).replace(/<[^>]*>/g, '').slice(0, 200);
                             const inner = (
                                 <Card className={`p-4 bg-[#F2F2EC] border-transparent transition-shadow ${email.case_id ? "hover:shadow-md hover:translate-x-1 cursor-pointer" : ""}`}>
                                     <div className="flex justify-between items-start mb-2">

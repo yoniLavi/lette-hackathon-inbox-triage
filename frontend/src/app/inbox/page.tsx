@@ -13,6 +13,7 @@ function formatDate(dateStr: string | null | undefined): string {
 import { getThreads, searchEmails, contactName } from "@/lib/crm";
 import type { CrmThread, CrmEmail } from "@/lib/crm";
 import { usePageData, buildInboxContext } from "@/lib/page-context";
+import { unescapeMarkdown } from "@/lib/unescape-markdown";
 import { ContactBadge } from "@/components/ui/ContactBadge";
 import { Card } from "@/components/ui/Card";
 import { DraftEditor } from "@/components/dashboard/DraftEditor";
@@ -50,7 +51,7 @@ function InboxEmailCard({ email, onUpdate, onDiscard }: { email: CrmEmail; onUpd
                 <DraftEditor email={email} onUpdate={onUpdate} onDiscard={onDiscard} />
             ) : (
                 <div className="px-5 py-4 text-sm font-sans text-[#0F1016] leading-relaxed whitespace-pre-line">
-                    {email.body_plain || email.body || "(no body)"}
+                    {unescapeMarkdown(email.body_plain || email.body) || "(no body)"}
                 </div>
             )}
         </Card>

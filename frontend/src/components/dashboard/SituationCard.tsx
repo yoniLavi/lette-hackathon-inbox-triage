@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import type { CrmCase, UrgencyTier } from "@/lib/crm";
 import { caseActionStatus } from "@/lib/crm";
+import { unescapeMarkdown } from "@/lib/unescape-markdown";
 import { Button } from "@/components/ui/Button";
 import { ChevronRight, ChevronDown, MapPin, FileEdit, AlertCircle, CheckCircle2, ListChecks } from "lucide-react";
 import { motion } from "framer-motion";
@@ -89,7 +90,7 @@ export function SituationCard({ crmCase, tier }: { crmCase: CrmCase; tier: Urgen
                                 onClick={toggleExpand}
                             >
                                 <div className={`text-[13px] font-serif text-[#0F1016] leading-snug prose prose-sm max-w-none ${!expanded ? "line-clamp-1 [&>*]:inline" : ""}`}>
-                                    <ReactMarkdown>{crmCase.description}</ReactMarkdown>
+                                    <ReactMarkdown>{unescapeMarkdown(crmCase.description)}</ReactMarkdown>
                                 </div>
                             </div>
                         )}

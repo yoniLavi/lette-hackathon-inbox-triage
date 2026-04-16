@@ -8,6 +8,7 @@ import { ArrowLeft, Search, CheckCircle2, Circle, Clock, ExternalLink, Send } fr
 import { getTasks, getContacts, getProperties, getCases, getTaskNotes, createNote, contactName, updateTask } from "@/lib/crm";
 import type { CrmTask, CrmContact, CrmProperty, CrmCase, CrmNote } from "@/lib/crm";
 import { usePageData, buildTasksContext } from "@/lib/page-context";
+import { unescapeMarkdown } from "@/lib/unescape-markdown";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
@@ -262,7 +263,7 @@ export default function TasksPage() {
                             {selected.description && (
                                 <Card className="p-5 bg-[#F2F2EC] border-transparent mb-6">
                                     <div className="prose prose-sm max-w-none text-[#0F1016] font-sans">
-                                        <ReactMarkdown>{selected.description}</ReactMarkdown>
+                                        <ReactMarkdown>{unescapeMarkdown(selected.description)}</ReactMarkdown>
                                     </div>
                                 </Card>
                             )}
