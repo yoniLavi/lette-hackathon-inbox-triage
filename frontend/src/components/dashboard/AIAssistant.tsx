@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { MessageSquare, X, Send, Sparkles, ChevronRight, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import { usePageData, serializePageContext } from "@/lib/page-context";
 
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:8001";
@@ -550,7 +551,7 @@ export function AIAssistant() {
                                         }`}>
                                         <div className={`text-[14px] leading-relaxed ${msg.role === "assistant" ? "font-serif chat-markdown" : "font-sans font-medium whitespace-pre-line"}`}>
                                             {msg.role === "assistant"
-                                                ? <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                                ? <ReactMarkdown remarkPlugins={[remarkBreaks]}>{msg.content}</ReactMarkdown>
                                                 : msg.content}
                                         </div>
                                         <span className={`text-[10px] block mt-1 opacity-50 ${msg.role === "user" ? "text-right" : ""}`}>
@@ -564,7 +565,7 @@ export function AIAssistant() {
                                 <div className="flex justify-start">
                                     <div className="max-w-[85%] rounded-[24px] p-4 bg-slate-50 border border-slate-100 text-[#0F1016] rounded-tl-none">
                                         <div className="text-[14px] leading-relaxed font-serif chat-markdown">
-                                            <ReactMarkdown>{streamingText}</ReactMarkdown>
+                                            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{streamingText}</ReactMarkdown>
                                         </div>
                                         {statusText && (
                                             <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
