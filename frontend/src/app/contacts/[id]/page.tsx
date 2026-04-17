@@ -47,9 +47,11 @@ export default function ContactDetail() {
             }
 
             // Get emails from this contact (exclude drafts — those are replies drafted on their behalf)
-            getEmails(100, { from_address: c.email, include: "contact" }).then(all => {
-                setEmails(all.filter(e => e.status !== "draft"));
-            }).catch(() => {});
+            if (c.email) {
+                getEmails(100, { from_address: c.email, include: "contact" }).then(all => {
+                    setEmails(all.filter(e => e.status !== "draft"));
+                }).catch(() => {});
+            }
 
             // Get tasks assigned to this contact
             getTasks(50, { contact_id: String(cid) }).then(setTasks).catch(() => {});

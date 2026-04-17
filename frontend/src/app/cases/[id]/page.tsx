@@ -107,9 +107,11 @@ function EmailCard({ email, isFirst }: { email: CrmEmail; isFirst: boolean }) {
                         <p className="text-[#0F1016]/80 text-sm font-medium">{email.subject}</p>
                     </div>
                 </div>
-                <span className="text-[10px] text-[#0F1016]/40 font-bold uppercase tracking-wider" suppressHydrationWarning>
-                    {formatDistanceToNow(new Date(email.date_sent), { addSuffix: true })}
-                </span>
+                {email.date_sent && (
+                    <span className="text-[10px] text-[#0F1016]/40 font-bold uppercase tracking-wider" suppressHydrationWarning>
+                        {formatDistanceToNow(new Date(email.date_sent), { addSuffix: true })}
+                    </span>
+                )}
             </div>
             {bodyText && (
                 <div className={`bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-700 font-sans leading-relaxed whitespace-pre-line ${expanded ? "" : "line-clamp-4"}`}>

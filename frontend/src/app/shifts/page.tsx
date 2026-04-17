@@ -40,7 +40,8 @@ function ElapsedTimer({ startedAt }: { startedAt: string }) {
     return <span className="text-xs text-blue-500/70 font-sans font-mono">{elapsed}</span>;
 }
 
-function formatTime(iso: string): string {
+function formatTime(iso: string | null): string {
+    if (!iso) return "—";
     return new Date(iso).toLocaleString("en-IE", {
         month: "short", day: "numeric",
         hour: "2-digit", minute: "2-digit",

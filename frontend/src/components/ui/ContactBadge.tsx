@@ -9,7 +9,8 @@ const typeStyles: Record<string, string> = {
     legal: "bg-red-50 border-red-200 text-red-700",
 };
 
-export function ContactBadge({ type }: { type: string }) {
+export function ContactBadge({ type }: { type: string | null }) {
+    if (!type) return null;
     const style = typeStyles[type] || typeStyles.internal;
     return (
         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-sans font-bold uppercase tracking-wider ${style}`}>

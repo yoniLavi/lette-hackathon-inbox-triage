@@ -2,13 +2,21 @@
  * CRM data client.
  * Uses the Next.js /api/crm proxy route (works from both server and client).
  *
- * Types are derived from @repo/crm-schema but adapted for the API response
- * format (dates as ISO strings, non-null defaults for always-present fields).
+ * Entity types come from @repo/crm-schema (Api* — dates serialized to strings).
+ * Crm* aliases extend them with ?include= fields populated by the API.
  */
 
-// Re-export the schema types for reference, but the Crm* types below
-// are the ones used throughout the frontend (with nullable overrides
-// matching what the API actually returns).
+import type {
+    ApiProperty,
+    ApiContact,
+    ApiCase,
+    ApiEmail,
+    ApiTask,
+    ApiNote,
+    ApiThread,
+    ApiShift,
+} from "@repo/crm-schema";
+
 async function crmFetch(path: string, params?: Record<string, string>) {
     const url = new URL("/api/crm", window.location.origin);
     url.searchParams.set("path", path);
@@ -26,133 +34,33 @@ async function crmFetch(path: string, params?: Record<string, string>) {
 
 export type UrgencyTier = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 
-// --- Types matching CRM entities ---
+// --- Entity types (with ?include= extensions) ---
 
-export interface CrmProperty {
-    id: number;
-    name: string;
-    type: string;
-    units: number;
-    manager: string;
-    manager_email: string;
-    description: string;
-    challenge_id?: string;
-    created_at: string;
-    updated_at: string;
-}
+export type CrmProperty = ApiProperty;
+export type CrmContact = ApiContact;
+export type CrmTask = ApiTask;
+export type CrmNote = ApiNote;
 
-export interface CrmContact {
-    id: number;
-    first_name: string;
-    last_name: string;
-    email: string;
-    type: string;
-    property_id?: number;
-    company: string;
-    unit: string;
-    role: string;
-    created_at: string;
-    updated_at: string;
-}
+export type CrmEmail = ApiEmail & {
+    contact?: CrmContact | null;
+};
 
-export interface CrmCase {
-    id: number;
-    name: string;
-    status: string;
-    priority: string;
-    description: string;
-    property_id?: number;
-    created_at: string;
-    updated_at: string;
-    // Populated via ?include=
+export type CrmCase = ApiCase & {
     property?: CrmProperty | null;
     emails?: CrmEmail[];
     tasks?: CrmTask[];
     notes?: CrmNote[];
-}
+};
 
-export interface CrmEmail {
-    id: number;
-    subject: string;
-    status: string;
-    date_sent: string;
-    from_address: string;
-    to_addresses: string[];
-    cc_addresses: string[];
-    body: string;
-    body_plain: string;
-    is_read: boolean;
-    is_replied: boolean;
-    is_important: boolean;
-    thread_id?: string;
-    thread_position?: number;
-    case_id?: number;
-    created_at: string;
-    updated_at: string;
-    // Populated via ?include=
-    contact?: CrmContact | null;
-}
-
-export interface CrmTask {
-    id: number;
-    name: string;
-    status: string;
-    priority: string;
-    description: string;
-    date_start?: string;
-    date_end?: string;
-    case_id?: number;
-    contact_id?: number;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface CrmNote {
-    id: number;
-    content: string;
-    case_id?: number;
-    shift_id?: number;
-    task_id?: number;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface CrmThread {
-    id: number;
-    thread_id: string;
-    subject: string;
-    last_activity_at: string;
-    email_count: number;
-    is_read: boolean;
-    case_id?: number;
-    property_id?: number;
-    contact_id?: number;
-    created_at: string;
-    updated_at: string;
-    // Populated via ?include=
+export type CrmThread = ApiThread & {
     emails?: CrmEmail[];
     contact?: CrmContact | null;
-}
+};
 
-export interface CrmShift {
-    id: number;
-    started_at: string;
-    completed_at: string | null;
-    status: string;
-    threads_processed: number;
-    emails_processed: number;
-    drafts_created: number;
-    tasks_created: number;
-    summary: string | null;
-    cost_usd: number | null;
-    current_thread_id: number | null;
-    case_id: number | null;
-    created_at: string;
-    updated_at: string;
-    // Populated via ?include=
+export type CrmShift = ApiShift & {
     case?: CrmCase | null;
     notes?: CrmNote[];
-}
+};
 
 async function crmPatch(path: string, body: Record<string, unknown>) {
     const url = new URL("/api/crm", window.location.origin);

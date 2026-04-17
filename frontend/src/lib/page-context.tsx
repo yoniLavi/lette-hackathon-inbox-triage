@@ -6,6 +6,9 @@ import { contactName, caseActionStatus, senderDisplay } from "./crm";
 
 // ---------- Types for structured page context ----------
 
+// Context-type field shorthands for nullable strings from the CRM
+type S = string | null;
+
 interface DashboardContext {
     page: "dashboard";
     caseCount: number;
@@ -17,31 +20,31 @@ interface DashboardContext {
         priority: string;
         status: string;
         actionStatus: string;
-        propertyName?: string;
-        description?: string;
+        propertyName?: S;
+        description?: S;
         pendingTasks?: string[];
-        draftSubjects?: string[];
+        draftSubjects?: S[];
     }[];
 }
 
 interface SituationEmailContext {
     id: number;
-    subject: string;
-    from: string;
+    subject: S;
+    from: S;
     to: string[];
     bodyPlain: string;
-    dateSent: string;
+    dateSent: S;
     status: string;
-    threadId?: string;
-    threadPosition?: number;
+    threadId?: S;
+    threadPosition?: number | null;
     isRead: boolean;
-    senderName?: string;
-    senderType?: string;
+    senderName?: S;
+    senderType?: S;
 }
 
 interface SituationDraftContext {
     id: number;
-    subject: string;
+    subject: S;
     to: string[];
     bodyPlain: string;
 }
@@ -51,8 +54,8 @@ interface SituationTaskContext {
     name: string;
     status: string;
     priority: string;
-    description?: string;
-    dueDate?: string;
+    description?: S;
+    dueDate?: S;
 }
 
 interface SituationContext {
@@ -62,25 +65,25 @@ interface SituationContext {
     priority: string;
     status: string;
     description: string;
-    propertyName?: string;
-    propertyManager?: string;
-    propertyManagerEmail?: string;
+    propertyName?: S;
+    propertyManager?: S;
+    propertyManagerEmail?: S;
     tasks: SituationTaskContext[];
     drafts: SituationDraftContext[];
     emails: SituationEmailContext[];
-    notes: { id: number; content: string; createdAt: string }[];
-    contacts: { name: string; type: string; email: string; company?: string; unit?: string }[];
+    notes: { id: number; content: S; createdAt: string }[];
+    contacts: { name: S; type: S; email: S; company?: S; unit?: S }[];
 }
 
 interface PropertiesContext {
     page: "properties";
     properties: {
         name: string;
-        type: string;
-        units: number;
-        manager: string;
-        managerEmail: string;
-        description?: string;
+        type: S;
+        units: number | null;
+        manager: S;
+        managerEmail: S;
+        description?: S;
         caseCount: number;
         contactCount: number;
     }[];
@@ -91,11 +94,11 @@ interface SearchContext {
     query: string;
     resultCount: number;
     topResults: {
-        subject: string;
+        subject: S;
         sender: string;
-        dateSent: string;
-        bodySnippet?: string;
-        caseId?: number;
+        dateSent: S;
+        bodySnippet?: S;
+        caseId?: number | null;
     }[];
 }
 
@@ -104,7 +107,7 @@ interface InboxContext {
     threadCount: number;
     unreadCount: number;
     draftCount: number;
-    threads: { threadId: string; subject: string; sender: string; emailCount: number; isRead: boolean; hasDraft: boolean; caseId?: number }[];
+    threads: { threadId: string; subject: S; sender: string; emailCount: number; isRead: boolean; hasDraft: boolean; caseId?: number | null }[];
 }
 
 interface TasksContext {
@@ -112,41 +115,41 @@ interface TasksContext {
     totalTasks: number;
     pendingCount: number;
     completedCount: number;
-    tasks: { id: number; name: string; status: string; priority: string; caseName?: string; description?: string }[];
+    tasks: { id: number; name: string; status: string; priority: string; caseName?: S; description?: S }[];
 }
 
 interface ContactsContext {
     page: "contacts";
     totalContacts: number;
-    contacts: { id: number; name: string; type: string; email: string; propertyName?: string; unit?: string; company?: string }[];
+    contacts: { id: number; name: S; type: S; email: S; propertyName?: S; unit?: S; company?: S }[];
 }
 
 interface PropertyDetailContext {
     page: "propertyDetail";
     propertyId: number;
     propertyName: string;
-    type: string;
-    units: number;
-    manager: string;
-    managerEmail: string;
+    type: S;
+    units: number | null;
+    manager: S;
+    managerEmail: S;
     openCaseCount: number;
-    openCases: { id: number; name: string; priority: string; status: string; actionStatus: string; description?: string }[];
+    openCases: { id: number; name: string; priority: string; status: string; actionStatus: string; description?: S }[];
     contactCount: number;
-    contacts: { id: number; name: string; type: string; email: string; unit?: string }[];
+    contacts: { id: number; name: S; type: S; email: S; unit?: S }[];
 }
 
 interface ContactDetailContext {
     page: "contactDetail";
     contactId: number;
-    contactName: string;
-    contactType: string;
-    email: string;
+    contactName: S;
+    contactType: S;
+    email: S;
     propertyName?: string;
-    unit?: string;
-    company?: string;
+    unit?: S;
+    company?: S;
     openCaseCount: number;
-    openCases: { id: number; name: string; priority: string; description?: string }[];
-    recentEmails: { id: number; subject: string; dateSent: string }[];
+    openCases: { id: number; name: string; priority: string; description?: S }[];
+    recentEmails: { id: number; subject: S; dateSent: S }[];
 }
 
 interface GenericContext {

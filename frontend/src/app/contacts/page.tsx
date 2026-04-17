@@ -37,7 +37,7 @@ export default function ContactsPage() {
         if (search) {
             const q = search.toLowerCase();
             const name = (contactName(c) || "").toLowerCase();
-            const email = c.email.toLowerCase();
+            const email = (c.email || "").toLowerCase();
             const company = (c.company || "").toLowerCase();
             return name.includes(q) || email.includes(q) || company.includes(q);
         }

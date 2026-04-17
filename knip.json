@@ -14,6 +14,7 @@
     "enumMembers": "warn",
     "duplicates": "warn"
   },
+  "includeEntryExports": true,
   "workspaces": {
     ".": {
       "entry": ["scripts/*.ts", "tests/*.test.ts"],

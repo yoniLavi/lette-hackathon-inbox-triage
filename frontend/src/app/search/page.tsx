@@ -83,9 +83,11 @@ export default function SearchPage() {
                                             <p className="font-bold text-[#0F1016] text-sm">{sender}</p>
                                             {email.contact && <ContactBadge type={email.contact.type} />}
                                         </div>
-                                        <span className="text-[10px] text-[#0F1016]/40 font-bold uppercase tracking-wider shrink-0" suppressHydrationWarning>
-                                            {formatDistanceToNow(new Date(email.date_sent), { addSuffix: true })}
-                                        </span>
+                                        {email.date_sent && (
+                                            <span className="text-[10px] text-[#0F1016]/40 font-bold uppercase tracking-wider shrink-0" suppressHydrationWarning>
+                                                {formatDistanceToNow(new Date(email.date_sent), { addSuffix: true })}
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="text-sm font-serif font-medium text-[#0F1016] mb-1">{email.subject}</p>
                                     {bodySnippet && (

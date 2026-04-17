@@ -8,6 +8,13 @@
       "when": 1774967497771,
       "tag": "0000_unknown_nehzno",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776390176475,
+      "tag": "0001_zippy_eternity",
+      "breakpoints": true
     }
   ]
 }

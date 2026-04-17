@@ -41,7 +41,7 @@ function InboxEmailCard({ email, onUpdate, onDiscard }: { email: CrmEmail; onUpd
                         {formatDate(email.date_sent)}
                     </span>
                 </div>
-                {email.to_addresses?.length > 0 && (
+                {email.to_addresses && email.to_addresses.length > 0 && (
                     <p className="text-[11px] text-[#0F1016]/40 font-sans mt-0.5">
                         To: {email.to_addresses.join(", ")}
                     </p>
@@ -75,7 +75,7 @@ export default function InboxPage() {
         getThreads("emails,contact", 200).then(all => {
             // Sort by last_activity_at desc
             const sorted = all.sort((a, b) =>
-                new Date(b.last_activity_at).getTime() - new Date(a.last_activity_at).getTime()
+                new Date(b.last_activity_at ?? 0).getTime() - new Date(a.last_activity_at ?? 0).getTime()
             );
             setThreads(sorted);
             setData(buildInboxContext(sorted));
