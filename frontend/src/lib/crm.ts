@@ -1,6 +1,5 @@
 /**
- * CRM data client.
- * Uses the Next.js /api/crm proxy route (works from both server and client).
+ * CRM data client — fetches through the Next.js /api/crm proxy.
  *
  * Entity types come from @repo/crm-schema (Api* — dates serialized to strings).
  * Crm* aliases extend them with ?include= fields populated by the API.
@@ -17,20 +16,32 @@ import type {
     ApiShift,
 } from "@repo/crm-schema";
 
-async function crmFetch(path: string, params?: Record<string, string>) {
+type Params = Record<string, string>;
+
+async function request<T>(method: string, path: string, params?: Params, body?: unknown): Promise<T> {
     const url = new URL("/api/crm", window.location.origin);
     url.searchParams.set("path", path);
-    if (params) {
-        for (const [k, v] of Object.entries(params)) {
-            url.searchParams.set(k, v);
-        }
+    if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    const init: RequestInit = { method, cache: "no-store" };
+    if (body !== undefined) {
+        init.body = JSON.stringify(body);
+        init.headers = { "Content-Type": "application/json" };
     }
-    const res = await fetch(url.toString(), { cache: "no-store" });
-    if (!res.ok) {
-        throw new Error(`CRM ${path}: ${res.status} ${res.statusText}`);
-    }
+    const res = await fetch(url.toString(), init);
+    if (!res.ok) throw new Error(`CRM ${method} ${path}: ${res.status} ${res.statusText}`);
     return res.json();
 }
+
+async function list<T>(entity: string, params?: Params): Promise<T[]> {
+    const data = await request<{ list?: T[] }>("GET", entity, params);
+    return data.list || [];
+}
+
+const one = <T>(entity: string, id: number, include?: string): Promise<T> =>
+    request<T>("GET", `${entity}/${id}`, include ? { include } : undefined);
+
+const withInclude = (include: string | undefined, rest: Params): Params =>
+    include ? { ...rest, include } : rest;
 
 export type UrgencyTier = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 
@@ -40,262 +51,107 @@ export type CrmProperty = ApiProperty;
 export type CrmContact = ApiContact;
 export type CrmTask = ApiTask;
 export type CrmNote = ApiNote;
-
-export type CrmEmail = ApiEmail & {
-    contact?: CrmContact | null;
-};
-
+export type CrmEmail = ApiEmail & { contact?: CrmContact | null };
 export type CrmCase = ApiCase & {
     property?: CrmProperty | null;
     emails?: CrmEmail[];
     tasks?: CrmTask[];
     notes?: CrmNote[];
 };
+export type CrmThread = ApiThread & { emails?: CrmEmail[]; contact?: CrmContact | null };
+export type CrmShift = ApiShift & { case?: CrmCase | null; notes?: CrmNote[] };
 
-export type CrmThread = ApiThread & {
-    emails?: CrmEmail[];
-    contact?: CrmContact | null;
-};
+// --- Mutations ---
 
-export type CrmShift = ApiShift & {
-    case?: CrmCase | null;
-    notes?: CrmNote[];
-};
+export const updateCase = (id: number, data: Record<string, unknown>) =>
+    request<CrmCase>("PATCH", `cases/${id}`, undefined, data);
+export const updateTask = (id: number, data: Record<string, unknown>) =>
+    request<CrmTask>("PATCH", `tasks/${id}`, undefined, data);
+export const updateEmail = (id: number, data: Record<string, unknown>) =>
+    request<CrmEmail>("PATCH", `emails/${id}`, undefined, data);
+export const deleteEmail = (id: number) =>
+    request<{ ok: boolean }>("DELETE", `emails/${id}`);
+export const createNote = (data: Record<string, unknown>) =>
+    request<CrmNote>("POST", "notes", undefined, data);
 
-async function crmPatch(path: string, body: Record<string, unknown>) {
-    const url = new URL("/api/crm", window.location.origin);
-    url.searchParams.set("path", path);
-    const res = await fetch(url.toString(), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-        throw new Error(`CRM PATCH ${path}: ${res.status} ${res.statusText}`);
-    }
-    return res.json();
-}
+// --- Single-entity fetches ---
 
-export async function updateCase(id: number, data: Record<string, unknown>) {
-    return crmPatch(`cases/${id}`, data);
-}
+export const getCase = (id: number, include?: string) => one<CrmCase>("cases", id, include);
+export const getProperty = (id: number) => one<CrmProperty>("properties", id);
+export const getContact = (id: number) => one<CrmContact>("contacts", id);
+export const getShift = (id: number, include?: string) => one<CrmShift>("shifts", id, include);
 
-export async function updateTask(id: number, data: Record<string, unknown>) {
-    return crmPatch(`tasks/${id}`, data);
-}
+// --- List fetches ---
 
-export async function deleteEmail(id: number) {
-    const url = new URL("/api/crm", window.location.origin);
-    url.searchParams.set("path", `emails/${id}`);
-    const res = await fetch(url.toString(), { method: "DELETE", cache: "no-store" });
-    if (!res.ok) throw new Error(`Delete email: ${res.status}`);
-    return res.json();
-}
+export const getCases = (include?: string) =>
+    list<CrmCase>("cases", withInclude(include, { order_by: "updated_at", order: "desc", limit: "50" }));
 
-export async function updateEmail(id: number, data: Record<string, unknown>) {
-    return crmPatch(`emails/${id}`, data);
-}
-
-// --- Fetch functions ---
-
-export async function getCases(include?: string): Promise<CrmCase[]> {
-    const params: Record<string, string> = {
-        order_by: "updated_at",
-        order: "desc",
-        limit: "50",
-    };
-    if (include) params.include = include;
-    const data = await crmFetch("cases", params);
-    return data.list || [];
-}
-
-export async function getCasesCreatedDuring(after: string, before: string): Promise<CrmCase[]> {
-    const data = await crmFetch("cases", {
-        created_at_after: after,
-        created_at_before: before,
-        order_by: "created_at",
-        order: "asc",
-        limit: "50",
+export const getCasesCreatedDuring = (after: string, before: string) =>
+    list<CrmCase>("cases", {
+        created_at_after: after, created_at_before: before,
+        order_by: "created_at", order: "asc", limit: "50",
         include: "emails,tasks,notes,property",
     });
-    return data.list || [];
-}
 
-export async function getCasesUpdatedDuring(after: string, before: string): Promise<CrmCase[]> {
-    const data = await crmFetch("cases", {
-        updated_at_after: after,
-        updated_at_before: before,
-        order_by: "updated_at",
-        order: "asc",
-        limit: "50",
+export const getCasesUpdatedDuring = (after: string, before: string) =>
+    list<CrmCase>("cases", {
+        updated_at_after: after, updated_at_before: before,
+        order_by: "updated_at", order: "asc", limit: "50",
         include: "emails,tasks,notes,property",
     });
-    return data.list || [];
-}
 
-export async function getCase(id: number, include?: string): Promise<CrmCase> {
-    const params: Record<string, string> = {};
-    if (include) params.include = include;
-    return crmFetch(`cases/${id}`, params);
-}
+export const getProperties = () =>
+    list<CrmProperty>("properties", { order_by: "name", order: "asc", limit: "50" });
 
-export async function getEmails(limit = 20, params?: Record<string, string>): Promise<CrmEmail[]> {
-    const data = await crmFetch("emails", {
-        order_by: "date_sent",
-        order: "desc",
-        limit: String(limit),
-        ...params,
+export const getContacts = (params?: Params) =>
+    list<CrmContact>("contacts", { order_by: "last_name", order: "asc", limit: "100", ...params });
+
+export const getEmails = (limit = 20, params?: Params) =>
+    list<CrmEmail>("emails", { order_by: "date_sent", order: "desc", limit: String(limit), ...params });
+
+export const getTasks = (limit = 50, params?: Params) =>
+    list<CrmTask>("tasks", { order_by: "updated_at", order: "desc", limit: String(limit), ...params });
+
+export const searchEmails = (query: string, limit = 20) =>
+    list<CrmEmail>("emails", {
+        search: query, order_by: "date_sent", order: "desc",
+        limit: String(limit), include: "contact",
     });
-    return data.list || [];
-}
 
-export async function searchEmails(query: string, limit = 20): Promise<CrmEmail[]> {
-    const data = await crmFetch("emails", {
-        search: query,
-        order_by: "date_sent",
-        order: "desc",
-        limit: String(limit),
-        include: "contact",
+export const getRelatedEmails = (caseId: number) =>
+    list<CrmEmail>("emails", {
+        case_id: String(caseId), order_by: "date_sent", order: "asc",
+        limit: "50", include: "contact",
     });
-    return data.list || [];
-}
 
-export async function getProperty(id: number): Promise<CrmProperty> {
-    return crmFetch(`properties/${id}`);
-}
+export const getRelatedTasks = (caseId: number) =>
+    list<CrmTask>("tasks", { case_id: String(caseId), order_by: "updated_at", order: "desc", limit: "50" });
 
-export async function getContact(id: number): Promise<CrmContact> {
-    return crmFetch(`contacts/${id}`);
-}
+export const getNotes = (caseId: number) =>
+    list<CrmNote>("notes", { case_id: String(caseId), order_by: "created_at", order: "asc", limit: "50" });
 
-export async function getProperties(): Promise<CrmProperty[]> {
-    const data = await crmFetch("properties", {
-        order_by: "name",
-        order: "asc",
-        limit: "50",
-    });
-    return data.list || [];
-}
+export const getTaskNotes = (taskId: number) =>
+    list<CrmNote>("notes", { task_id: String(taskId), order_by: "created_at", order: "asc", limit: "50" });
 
-export async function getTasks(limit = 50, params?: Record<string, string>): Promise<CrmTask[]> {
-    const data = await crmFetch("tasks", {
-        order_by: "updated_at",
-        order: "desc",
-        limit: String(limit),
-        ...params,
-    });
-    return data.list || [];
-}
+export const getThreads = (include?: string, limit = 20) =>
+    list<CrmThread>("threads", withInclude(include, { order_by: "last_activity_at", order: "desc", limit: String(limit) }));
 
-export async function getRelatedEmails(caseId: number): Promise<CrmEmail[]> {
-    const data = await crmFetch("emails", {
-        case_id: String(caseId),
-        order_by: "date_sent",
-        order: "asc",
-        limit: "50",
-        include: "contact",
-    });
-    return data.list || [];
-}
-
-export async function getRelatedTasks(caseId: number): Promise<CrmTask[]> {
-    const data = await crmFetch("tasks", {
-        case_id: String(caseId),
-        order_by: "updated_at",
-        order: "desc",
-        limit: "50",
-    });
-    return data.list || [];
-}
-
-export async function getNotes(caseId: number): Promise<CrmNote[]> {
-    const data = await crmFetch("notes", {
-        case_id: String(caseId),
-        order_by: "created_at",
-        order: "asc",
-        limit: "50",
-    });
-    return data.list || [];
-}
-
-export async function getTaskNotes(taskId: number): Promise<CrmNote[]> {
-    const data = await crmFetch("notes", {
-        task_id: String(taskId),
-        order_by: "created_at",
-        order: "asc",
-        limit: "50",
-    });
-    return data.list || [];
-}
-
-export async function createNote(data: Record<string, unknown>): Promise<CrmNote> {
-    const url = new URL("/api/crm", window.location.origin);
-    url.searchParams.set("path", "notes");
-    const res = await fetch(url.toString(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-        cache: "no-store",
-    });
-    if (!res.ok) throw new Error(`Create note: ${res.status}`);
-    return res.json();
-}
-
-export async function getContacts(params?: Record<string, string>): Promise<CrmContact[]> {
-    const data = await crmFetch("contacts", {
-        order_by: "last_name",
-        order: "asc",
-        limit: "100",
-        ...params,
-    });
-    return data.list || [];
-}
-
-export async function getThreads(include?: string, limit = 20): Promise<CrmThread[]> {
-    const params: Record<string, string> = {
-        order_by: "last_activity_at",
-        order: "desc",
-        limit: String(limit),
-    };
-    if (include) params.include = include;
-    const data = await crmFetch("threads", params);
-    return data.list || [];
-}
-
-export async function getShifts(params?: Record<string, string>): Promise<CrmShift[]> {
-    const data = await crmFetch("shifts", {
-        order_by: "started_at",
-        order: "desc",
-        limit: "50",
-        include: "notes",
-        ...params,
-    });
-    return data.list || [];
-}
-
-export async function getShift(id: number, include?: string): Promise<CrmShift> {
-    const params: Record<string, string> = {};
-    if (include) params.include = include;
-    return crmFetch(`shifts/${id}`, params);
-}
+export const getShifts = (params?: Params) =>
+    list<CrmShift>("shifts", { order_by: "started_at", order: "desc", limit: "50", include: "notes", ...params });
 
 export async function getUnreadThreads(): Promise<{ threads: CrmThread[]; total: number }> {
-    const data = await crmFetch("threads", {
-        is_read: "false",
-        order_by: "last_activity_at",
-        order: "asc",
-        limit: "200",
-        include: "contact",
+    const data = await request<{ list?: CrmThread[]; total?: number }>("GET", "threads", {
+        is_read: "false", order_by: "last_activity_at", order: "asc",
+        limit: "200", include: "contact",
     });
     return { threads: data.list || [], total: data.total || 0 };
 }
 
-export async function getCounts(): Promise<{ emails: number; open_tasks: number; closed_cases: number }> {
-    return crmFetch("counts");
-}
+export const getCounts = () =>
+    request<{ emails: number; open_tasks: number; closed_cases: number }>("GET", "counts");
 
 export async function getDraftCount(): Promise<number> {
-    const data = await crmFetch("emails", { status: "draft", limit: "1" });
+    const data = await request<{ total?: number }>("GET", "emails", { status: "draft", limit: "1" });
     return data.total || 0;
 }
 
@@ -307,8 +163,7 @@ export function contactName(contact?: CrmContact | null): string | null {
 }
 
 export function senderDisplay(email: CrmEmail): string {
-    const name = contactName(email.contact);
-    return name || email.from_address || "Unknown sender";
+    return contactName(email.contact) || email.from_address || "Unknown sender";
 }
 
 /** Derive action status text for a case based on its linked emails and tasks. */
