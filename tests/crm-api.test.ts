@@ -355,6 +355,41 @@ describe("shift endpoints", () => {
     await api("DELETE", `/api/emails/${e.data.id}`);
   });
 
+  test("shift/complete increments active shift counters", async () => {
+    const shift = await api("POST", "/api/shifts", { status: "in_progress" });
+    expect(shift.status).toBe(201);
+    const shiftId = shift.data.id as number;
+    try {
+      const e1 = await api("POST", "/api/emails", {
+        subject: "Counter test 1",
+        from_address: "counter@test.com",
+        thread_id: "test_thread_counter",
+        thread_position: 1,
+        is_read: false,
+      });
+      const e2 = await api("POST", "/api/emails", {
+        subject: "Re: Counter test 1",
+        from_address: "counter2@test.com",
+        thread_id: "test_thread_counter",
+        thread_position: 2,
+        is_read: false,
+      });
+      await api("POST", "/api/shift/complete", {
+        email_ids: [e1.data.id, e2.data.id],
+        thread_id: "test_thread_counter",
+      });
+      const { data: after } = await apiGet(`/api/shifts/${shiftId}`);
+      expect(after.threads_processed).toBe(1);
+      expect(after.emails_processed).toBe(2);
+
+      await api("DELETE", `/api/emails/${e1.data.id}`);
+      await api("DELETE", `/api/emails/${e2.data.id}`);
+    } finally {
+      await api("PATCH", `/api/shifts/${shiftId}`, { status: "completed" });
+      await api("DELETE", `/api/shifts/${shiftId}`);
+    }
+  });
+
   test("shift/complete marks emails read", async () => {
     const e1 = await api("POST", "/api/emails", {
       subject: "Complete test 1",

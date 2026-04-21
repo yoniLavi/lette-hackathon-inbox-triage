@@ -19,6 +19,7 @@ import {
   cases,
   tasks,
   threads,
+  shifts,
   ENTITY_TABLES,
   type EntityName,
 } from "@repo/crm-schema";
@@ -170,6 +171,19 @@ apiRoutes.post("/api/shift/complete", async (c) => {
 
   if (threadIdStr) {
     await upsertThread(db, threadIdStr);
+  }
+
+  // Increment the active shift's counters so the shifts page reflects progress.
+  // There's at most one in_progress shift at a time; if none, this is a no-op.
+  if (threadIdStr) {
+    await db
+      .update(shifts)
+      .set({
+        threads_processed: sql`${shifts.threads_processed} + 1`,
+        emails_processed: sql`${shifts.emails_processed} + ${updated}`,
+        updated_at: new Date(),
+      })
+      .where(eq(shifts.status, "in_progress"));
   }
 
   log(
