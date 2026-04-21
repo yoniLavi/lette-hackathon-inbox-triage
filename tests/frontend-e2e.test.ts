@@ -124,10 +124,23 @@ function firstCaseId(): number {
   return fixtureCaseIds[0];
 }
 
+/**
+ * Navigate and wait for the page to be interactive.
+ *
+ * Uses `load` (not `networkidle`) so long-lived polling loops — like the shifts
+ * page intervals or an open browser tab on /shifts — can't starve the test.
+ * `load` is enough to ensure React has hydrated and click handlers are wired.
+ */
+async function goto(page: Page, url: string, readySelector = "body") {
+  await page.goto(url, { waitUntil: "load" });
+  await page.locator(readySelector).first().waitFor({ state: "visible", timeout: 10_000 });
+}
+
 function openChat(page: Page) {
   return (async () => {
-    await page.goto(FRONTEND_URL, { waitUntil: "networkidle" });
+    await goto(page, FRONTEND_URL);
     const toggle = page.locator("button.w-16.h-16");
+    await toggle.waitFor({ state: "visible", timeout: 10_000 });
     await toggle.click();
     const input = page.locator("textarea[placeholder*='Ask anything']");
     await expectVisible(input, 3000);
@@ -178,9 +191,7 @@ async function waitForResponse(
 
 async function openChatOnSituation(page: Page, caseId?: number) {
   if (caseId === undefined) caseId = firstCaseId();
-  await page.goto(`${FRONTEND_URL}/cases/${caseId}`, {
-    waitUntil: "networkidle",
-  });
+  await goto(page, `${FRONTEND_URL}/cases/${caseId}`, "button.w-16.h-16");
   const toggle = page.locator("button.w-16.h-16");
   await toggle.click();
   const input = page.locator("textarea[placeholder*='Ask anything']");
@@ -219,14 +230,14 @@ describe("frontend e2e", () => {
   });
 
   test("dashboard loads", async () => {
-    await page.goto(FRONTEND_URL, { waitUntil: "networkidle" });
+    await goto(page, FRONTEND_URL);
     await page.waitForSelector("text=/Situations|Cases|Dashboard/i", {
       timeout: 10_000,
     });
   });
 
   test("chat widget opens and closes", async () => {
-    await page.goto(FRONTEND_URL, { waitUntil: "networkidle" });
+    await goto(page, FRONTEND_URL);
     const toggle = page.locator("button.w-16.h-16");
 
     await toggle.click();
@@ -272,7 +283,7 @@ describe("frontend e2e", () => {
   });
 
   test("context aware response", { timeout: FAST_TIMEOUT + 10_000 }, async () => {
-    await page.goto(FRONTEND_URL, { waitUntil: "networkidle" });
+    await goto(page, FRONTEND_URL);
     await openChat(page);
     const n = await sendMessage(
       page,
@@ -387,10 +398,7 @@ describe("frontend e2e", () => {
     // previously rendered as "\n\n" in the UI. The unescapeMarkdown helper
     // normalizes these at display time.
     const caseId = firstCaseId();
-    await page.goto(`${FRONTEND_URL}/cases/${caseId}`, {
-      waitUntil: "networkidle",
-    });
-    await page.waitForSelector("[data-ai-target^='task-']", { timeout: 10_000 });
+    await goto(page, `${FRONTEND_URL}/cases/${caseId}`, "[data-ai-target^='task-']");
 
     const bodyText = await page.locator("body").innerText();
     const literalEscapes = bodyText.match(/\\n/g) || [];
@@ -402,9 +410,7 @@ describe("frontend e2e", () => {
 
   test("situation has ai-target attributes", async () => {
     const caseId = firstCaseId();
-    await page.goto(`${FRONTEND_URL}/cases/${caseId}`, {
-      waitUntil: "networkidle",
-    });
+    await goto(page, `${FRONTEND_URL}/cases/${caseId}`, "[data-ai-target]");
 
     const targets = page.locator("[data-ai-target]");
     const count = await targets.count();
@@ -495,7 +501,7 @@ describe("frontend e2e", () => {
   // experience: the request doesn't hit a dead end.
 
   test("scrollTo case on dashboard", { timeout: FAST_TIMEOUT + 10_000 }, async () => {
-    await page.goto(FRONTEND_URL, { waitUntil: "networkidle" });
+    await goto(page, FRONTEND_URL);
     const caseId = firstCaseId();
     // Fetch case name so we can ask about it by name
     const caseRes = await fetch(`${CRM_URL}/api/cases/${caseId}`);
@@ -522,7 +528,7 @@ describe("frontend e2e", () => {
   });
 
   test("navigate from dashboard to situation", { timeout: FAST_TIMEOUT + 10_000 }, async () => {
-    await page.goto(FRONTEND_URL, { waitUntil: "networkidle" });
+    await goto(page, FRONTEND_URL);
     const caseId = firstCaseId();
     const caseRes = await fetch(`${CRM_URL}/api/cases/${caseId}`);
     const caseData = (await caseRes.json()) as { name: string };
@@ -545,8 +551,7 @@ describe("frontend e2e", () => {
   });
 
   test("navigate uses new page context", { timeout: SLOW_TIMEOUT + 10_000 }, async () => {
-    await page.goto(`${FRONTEND_URL}/inbox`, { waitUntil: "networkidle" });
-    await page.waitForSelector("text=/Inbox/i", { timeout: 30_000 });
+    await goto(page, `${FRONTEND_URL}/inbox`, "text=/Inbox/i");
 
     const toggle = page.locator("button.w-16.h-16");
     await expectVisible(toggle, 10_000);
@@ -568,28 +573,19 @@ describe("frontend e2e", () => {
   // --- Page load tests ---
 
   test("inbox page loads", async () => {
-    await page.goto(`${FRONTEND_URL}/inbox`, {
-      waitUntil: "domcontentloaded",
-    });
-    await page.waitForSelector("text=/Inbox/i", { timeout: 30_000 });
+    await goto(page, `${FRONTEND_URL}/inbox`, "text=/Inbox/i");
     const search = page.locator("input[placeholder*='Search']");
     await expectVisible(search, 10_000);
   });
 
   test("tasks page loads", async () => {
-    await page.goto(`${FRONTEND_URL}/tasks`, {
-      waitUntil: "networkidle",
-    });
-    await page.waitForSelector("text=/Tasks/i", { timeout: 10_000 });
+    await goto(page, `${FRONTEND_URL}/tasks`, "text=/Tasks/i");
   });
 
   test("contacts page loads", async () => {
-    await page.goto(`${FRONTEND_URL}/contacts`, {
-      waitUntil: "networkidle",
-    });
-    await page.waitForSelector("text=/Contacts/i", { timeout: 10_000 });
-    await page.waitForTimeout(3000);
+    await goto(page, `${FRONTEND_URL}/contacts`, "text=/Contacts/i");
     const tenantBtn = page.locator("button:has-text('Tenants')");
+    await tenantBtn.waitFor({ state: "visible", timeout: 10_000 });
     expect(await tenantBtn.count()).toBeGreaterThan(0);
   });
 
@@ -599,10 +595,7 @@ describe("frontend e2e", () => {
     if (!data.list.length) return; // skip
 
     const pid = data.list[0].id;
-    await page.goto(`${FRONTEND_URL}/properties/${pid}`, {
-      waitUntil: "domcontentloaded",
-    });
-    await page.waitForSelector("text=/Open Cases/i", { timeout: 30_000 });
+    await goto(page, `${FRONTEND_URL}/properties/${pid}`, "text=/Open Cases/i");
   });
 
   test("contact detail loads", async () => {
@@ -611,10 +604,7 @@ describe("frontend e2e", () => {
     if (!data.list.length) return; // skip
 
     const cid = data.list[0].id;
-    await page.goto(`${FRONTEND_URL}/contacts/${cid}`, {
-      waitUntil: "domcontentloaded",
-    });
-    await page.waitForSelector("text=/Open Cases/i", { timeout: 30_000 });
+    await goto(page, `${FRONTEND_URL}/contacts/${cid}`, "text=/Open Cases/i");
   });
 
   test("AI navigates to inbox", { timeout: FAST_TIMEOUT + 10_000 }, async () => {

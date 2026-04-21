@@ -120,14 +120,19 @@ class ClaudeSDKSession implements AgentSession {
         // The SDK emits various message types — map them to AgentEvent
         const msgType = (msg as Record<string, unknown>).type as string;
 
-        if (msgType === "assistant" || msgType === "stream_event") {
-          const raw = msg as Record<string, unknown>;
-          // SDK puts text in .message (not .content)
-          const text = (raw.message ?? raw.content) as string | undefined;
-          if (text) {
-            textParts.push(text);
-            yield { type: "text_delta", text };
+        if (msgType === "assistant") {
+          // SDKAssistantMessage.message is a BetaMessage, not a string.
+          // Extract text from its content blocks.
+          const raw = msg as { message?: { content?: Array<{ type?: string; text?: string }> } };
+          for (const block of raw.message?.content ?? []) {
+            if (block?.type === "text" && typeof block.text === "string" && block.text) {
+              textParts.push(block.text);
+              yield { type: "text_delta", text: block.text };
+            }
           }
+        } else if (msgType === "stream_event") {
+          // Partial deltas during streaming — the completed "assistant" event
+          // delivers the same text when the block finishes, so skip here.
         } else if (msgType === "tool_use_summary") {
           const tool = msg as Record<string, unknown>;
           const toolName = (tool.tool_name ?? tool.name ?? "unknown") as string;
@@ -153,10 +158,10 @@ class ClaudeSDKSession implements AgentSession {
         } else if (msgType === "result") {
           const result = msg as Record<string, unknown>;
           log.info(`[${this.agentName}] result: turns=${result.num_turns} stop=${result.stop_reason} is_error=${result.is_error} cost=$${result.total_cost_usd ?? "?"} result=${String(result.result ?? "").slice(0, 200)}`);
-          // Capture the result text — the SDK puts the final answer here,
-          // not in assistant/stream_event content fields
+          // Fallback: if no text came through "assistant" events, use result.result
+          // (which SDKResultSuccess guarantees is a string).
           const resultText = result.result as string | undefined;
-          if (resultText) {
+          if (textParts.length === 0 && typeof resultText === "string" && resultText) {
             textParts.push(resultText);
             yield { type: "text_delta", text: resultText };
           }
