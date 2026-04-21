@@ -12,7 +12,7 @@
     "@anthropic-ai/bedrock-sdk": "^0.26.0",
     "@anthropic-ai/claude-agent-sdk": "^0.2.81",
     "@hono/node-server": "^1.14.0",
-    "hono": "^4.7.0",
+    "hono": "^4.12.14",
     "zod": "^4.0.0"
   },
   "devDependencies": {
